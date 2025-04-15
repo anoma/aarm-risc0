@@ -5,7 +5,9 @@ use aarm_core::{
 };
 use bincode;
 use methods::{COMPLIANCE_GUEST_ELF, COMPLIANCE_GUEST_ID};
-use risc0_zkvm::{default_prover, ExecutorEnv};
+use risc0_ethereum_contracts::encode_seal;
+use risc0_zkvm::sha::Digest;
+use risc0_zkvm::{default_prover, ExecutorEnv, ProverOpts, VerifierContext};
 use serde_bytes::ByteBuf;
 use std::time::Instant;
 
@@ -24,10 +26,25 @@ pub fn main() {
         .build()
         .unwrap();
 
-    let prover = default_prover();
+    let receipt = default_prover()
+        .prove_with_ctx(
+            env,
+            &VerifierContext::default(),
+            COMPLIANCE_GUEST_ELF,
+            &ProverOpts::groth16(),
+        )
+        .unwrap()
+        .receipt;
 
-    // Produce a receipt by proving the specified ELF binary.
-    let receipt = prover.prove(env, COMPLIANCE_GUEST_ELF).unwrap().receipt;
+    println!("Receipt: {:?}", receipt);
+
+    let seal = encode_seal(&receipt).unwrap();
+    println!("Seal: {:?}", seal);
+
+    println!("imageId: {:?}", COMPLIANCE_GUEST_ID);
+    println!("imageId: {:?}", Digest::from(COMPLIANCE_GUEST_ID));
+
+    println!("journal: {:?}", receipt.journal.bytes);
 
     let prove_duration = prove_start_timer.elapsed();
     println!("Prove duration time: {:?}", prove_duration);
