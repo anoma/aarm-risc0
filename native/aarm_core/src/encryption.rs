@@ -6,7 +6,7 @@ use k256::{
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Ciphertext {
     // AES GCM encrypted message
     cipher: Vec<u8>,
