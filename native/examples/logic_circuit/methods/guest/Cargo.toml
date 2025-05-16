@@ -9,7 +9,7 @@ edition = "2021"
 # If you want to try (experimental) std support, add `features = [ "std" ]` to risc0-zkvm
 risc0-zkvm = { version = "^2.0.2", default-features = false, features = ['std', "unstable", "client"] }
 aarm_core = { path = "../../../../aarm_core" }
-k256 = { version = "=0.13.1", features = ["arithmetic", "serde", "expose-field", "std", "ecdsa", "hash2curve"], default-features = false }
+k256 = { version = "=0.13.3", features = ["arithmetic", "serde", "expose-field", "std", "ecdsa", "hash2curve"], default-features = false }
 
 [patch.crates-io]
 # Placing this patch statement in the workspace Cargo.toml will add RISC Zero SHA-256 accelerator

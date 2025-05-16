@@ -11,7 +11,7 @@ methods = { path = "../methods" }
 risc0-zkvm = { version = "^2.0.2", default-features = false, features = ['std', "unstable", "client"] }
 serde = { version = "1.0.197", default-features = false }
 serde-big-array = "0.5.1"
-k256 = { version = "=0.13.1", features = ["arithmetic", "serde", "expose-field", "std", "ecdsa", "hash2curve"], default-features = false }
+k256 = { version = "=0.13.3", features = ["arithmetic", "serde", "expose-field", "std", "ecdsa", "hash2curve"], default-features = false }
 sha2 = "0.10.6"
 rand = "0.8"
 aarm_core = { path = "../../../aarm_core" }

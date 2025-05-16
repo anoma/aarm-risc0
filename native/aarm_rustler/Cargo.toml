@@ -18,5 +18,5 @@ serde_json = "1.0.120"
 rand = "0.8"
 methods = { path = "../examples/compliance_circuit/methods" }
 aes-gcm = "0.10"
-k256 = { version = "=0.13.1", features = ["serde", "arithmetic"] }
+k256 = { version = "=0.13.3", features = ["serde", "arithmetic"] }
 aarm_core = { path = "../aarm_core" }
