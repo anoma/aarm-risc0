@@ -75,7 +75,7 @@ impl Action {
             .compliance_units
             .iter()
             .map(|receipt| AdapterComplianceUnit {
-                seal: encode_seal(&receipt).unwrap(),
+                seal: encode_seal(receipt).unwrap(),
                 journal: receipt.journal.bytes.clone(),
             })
             .collect();
