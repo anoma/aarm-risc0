@@ -6,7 +6,7 @@ pub struct LogicInstance {
     pub tag: Digest,
     pub is_consumed: bool,
     pub root: Digest,
-    pub cipher: Vec<u8>,
+    pub cipher: Vec<Vec<u8>>,
     pub app_data: Vec<ExpirableBlob>,
 }
 

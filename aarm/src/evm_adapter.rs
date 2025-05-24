@@ -33,14 +33,14 @@ pub struct AdapterLogicInstance {
     pub tag: Digest,
     pub is_consumed: bool,
     pub root: Digest,
-    pub cipher: Vec<String>,
+    pub cipher: Vec<Vec<u8>>,
     pub app_data: Vec<AdapterExpirableBlob>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct AdapterExpirableBlob {
-    pub blob: Vec<String>,
-    pub deletion_criterion: String,
+    pub blob: Vec<u8>,
+    pub deletion_criterion: u8,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -53,15 +53,20 @@ pub struct AdapterLogicProof {
     pub instance: AdapterLogicInstance,
 }
 
+fn insert_zeros(vec: Vec<u8>) -> Vec<u8> {
+    vec.into_iter()
+        .flat_map(|byte| {
+            // Create an iterator that contains the original byte followed by three 0s
+            std::iter::once(byte).chain(std::iter::repeat(u8::from(0)).take(3))
+        })
+        .collect() // Collect into a new Vec<u8>
+}
+
 impl From<ExpirableBlob> for AdapterExpirableBlob {
     fn from(blob: ExpirableBlob) -> Self {
         AdapterExpirableBlob {
-            blob: blob
-                .blob
-                .iter()
-                .map(|b| format!("{:02x}000000", b))
-                .collect(),
-            deletion_criterion: format!("{:02x}000000", blob.deletion_criterion),
+            blob: insert_zeros(blob.blob),
+            deletion_criterion: blob.deletion_criterion,
         }
     }
 }
@@ -70,8 +75,8 @@ impl From<LogicInstance> for AdapterLogicInstance {
     fn from(instance: LogicInstance) -> Self {
         let cipher = instance
             .cipher
-            .iter()
-            .map(|b| format!("{:02x}0000000", b))
+            .into_iter()
+            .map(|c| insert_zeros(c))
             .collect();
         let app_data = instance
             .app_data
@@ -85,5 +90,23 @@ impl From<LogicInstance> for AdapterLogicInstance {
             cipher,
             app_data,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::transaction::generate_test_transaction;
+    use std::env;
+
+    #[test]
+    fn print_tx() {
+        env::var("BONSAI_API_KEY").expect("Couldn't read BONSAI_API_KEY");
+        env::var("BONSAI_API_URL").expect("Couldn't read BONSAI_API_URL");
+
+        let raw_tx = generate_test_transaction(1);
+        println!(
+            "EVM Tx:\n{:#?}",
+            raw_tx.convert().actions[0].logic_proofs[0].instance
+        );
     }
 }
