@@ -45,14 +45,14 @@ impl LogicCircuit for TrivialLogicWitness {
             tag,
             is_consumed: self.is_consumed, // It can be either consumed or created to reduce padding resources
             root,
-            cipher: vec![vec![0, 0, 0, 0], vec![255, 255, 255, 255]], // TODO; move it to a special test
+            cipher: vec![63, 127, 191, 255], // TODO; move it to a special test
             app_data: vec![
                 ExpirableBlob {
-                    blob: vec![0, 0, 0, 0],
+                    blob: vec![31, 63, 95, 127],
                     deletion_criterion: 0,
                 },
                 ExpirableBlob {
-                    blob: vec![255, 255, 255, 255],
+                    blob: vec![159, 191, 223, 255],
                     deletion_criterion: 1,
                 },
             ],

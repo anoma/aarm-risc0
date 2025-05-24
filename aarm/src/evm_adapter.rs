@@ -33,7 +33,7 @@ pub struct AdapterLogicInstance {
     pub tag: Digest,
     pub is_consumed: bool,
     pub root: Digest,
-    pub cipher: Vec<Vec<u8>>,
+    pub cipher: Vec<u8>,
     pub app_data: Vec<AdapterExpirableBlob>,
 }
 
@@ -73,11 +73,7 @@ impl From<ExpirableBlob> for AdapterExpirableBlob {
 
 impl From<LogicInstance> for AdapterLogicInstance {
     fn from(instance: LogicInstance) -> Self {
-        let cipher = instance
-            .cipher
-            .into_iter()
-            .map(|c| insert_zeros(c))
-            .collect();
+        let cipher = insert_zeros(instance.cipher);
         let app_data = instance
             .app_data
             .into_iter()
