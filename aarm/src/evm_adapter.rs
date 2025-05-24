@@ -59,9 +59,9 @@ impl From<ExpirableBlob> for AdapterExpirableBlob {
             blob: blob
                 .blob
                 .iter()
-                .map(|b| format!("{:02x}0000000", b))
+                .map(|b| format!("{:02x}000000", b))
                 .collect(),
-            deletion_criterion: format!("{:02x}0000000", blob.deletion_criterion),
+            deletion_criterion: format!("{:02x}000000", blob.deletion_criterion),
         }
     }
 }
