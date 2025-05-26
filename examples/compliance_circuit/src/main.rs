@@ -7,6 +7,14 @@ use risc0_zkvm::{default_prover, ExecutorEnv};
 use std::time::Instant;
 
 pub fn main() {
+    println!(
+        "{:?}",
+        COMPLIANCE_GUEST_ID
+            .iter()
+            .map(|&e| format!("{:08x}", e))
+            .collect::<String>()
+    );
+
     let prove_start_timer = Instant::now();
 
     let compliance_witness: ComplianceWitness<COMMITMENT_TREE_DEPTH> =
