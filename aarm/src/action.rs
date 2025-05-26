@@ -207,12 +207,4 @@ pub mod tests {
     fn test_action() {
         let _ = create_an_action(1);
     }
-
-    #[test]
-    fn print_compliance_id() {
-        println!(
-            "Compliance Guest ID: {:?}",
-            Digest::from(compliance_circuit::COMPLIANCE_GUEST_ID)
-        );
-    }
 }
