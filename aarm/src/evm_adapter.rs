@@ -9,7 +9,6 @@ use aarm_core::{
     logic_instance::{ExpirableBlob, LogicInstance},
 };
 use risc0_ethereum_contracts::encode_seal;
-use risc0_zkvm::sha::Digest;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -38,9 +37,9 @@ pub struct AdapterComplianceUnit {
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct AdapterLogicInstance {
-    pub tag: Digest,
+    pub tag: [u8; 32],
     pub is_consumed: bool,
-    pub root: Digest,
+    pub root: [u8; 32],
     pub cipher: Vec<u8>,
     pub app_data: Vec<AdapterExpirableBlob>,
 }
@@ -54,7 +53,7 @@ pub struct AdapterExpirableBlob {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct AdapterLogicProof {
     // The verifying key corresponds to the imageID in risc0
-    pub verifying_key: Digest,
+    pub verifying_key: [u8; 32],
     // The proof corresponds to the seal in risc0
     pub proof: Vec<u8>,
     // The instance corresponds to the journal in risc0
@@ -102,7 +101,7 @@ impl From<Action> for AdapterAction {
             .map(|proof| {
                 let instance: LogicInstance = proof.receipt.journal.decode().unwrap();
                 AdapterLogicProof {
-                    verifying_key: proof.verifying_key,
+                    verifying_key: proof.verifying_key.into(),
                     proof: encode_seal(&proof.receipt).unwrap(),
                     instance: instance.into(),
                 }
@@ -135,25 +134,22 @@ impl From<LogicInstance> for AdapterLogicInstance {
             .map(AdapterExpirableBlob::from)
             .collect();
         AdapterLogicInstance {
-            tag: instance.tag,
+            tag: instance.tag.into(),
             is_consumed: instance.is_consumed,
-            root: instance.root,
+            root: instance.root.into(),
             cipher,
             app_data,
         }
     }
 }
 
-pub fn get_compliance_id() -> Digest {
-    Digest::from(crate::constants::COMPLIANCE_GUEST_ID)
-}
+// pub fn get_compliance_id() -> Digest {
+//     Digest::from(crate::constants::COMPLIANCE_GUEST_ID)
+// }
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        evm_adapter::{get_compliance_id, AdapterTransaction},
-        transaction::generate_test_transaction,
-    };
+    use crate::{evm_adapter::AdapterTransaction, transaction::generate_test_transaction};
     use std::env;
 
     #[test]
@@ -168,8 +164,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn print_compliance_id() {
-        println!("compliance_id: {:?}", get_compliance_id());
-    }
+    // #[test]
+    // fn print_compliance_id() {
+    //     println!("compliance_id: {:?}", get_compliance_id());
+    // }
 }
