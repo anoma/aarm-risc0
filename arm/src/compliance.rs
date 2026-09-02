@@ -92,8 +92,8 @@ impl ComplianceWitness {
     /// Creates a new compliance witness from the given resources. It uses the
     /// initial root for ephemeral resources.
     pub fn from_resources(
-        consumed_data: &[ConsumedResourceWitness],
-        created_resources: &[Resource],
+        consumed_data: Vec<ConsumedResourceWitness>,
+        created_resources: Vec<Resource>,
         kind_table: Vec<KindTableEntry>,
     ) -> Self {
         Self::from_resources_with_ephemeral_root(
@@ -107,8 +107,8 @@ impl ComplianceWitness {
     /// Creates a new compliance witness from the given resources and a valid
     /// root when consuming an ephemeral resource.
     pub fn from_resources_with_ephemeral_root(
-        consumed_data: &[ConsumedResourceWitness],
-        created_resources: &[Resource],
+        consumed_data: Vec<ConsumedResourceWitness>,
+        created_resources: Vec<Resource>,
         valid_root: Digest,
         kind_table: Vec<KindTableEntry>,
     ) -> Self {
@@ -127,15 +127,15 @@ impl ComplianceWitness {
     /// Creates a new compliance witness from each of its component parts.
     /// The other constructors are convenience wrappers that fill in defaults.
     fn from_parts(
-        consumed_data: &[ConsumedResourceWitness],
-        created_resources: &[Resource],
+        consumed_data: Vec<ConsumedResourceWitness>,
+        created_resources: Vec<Resource>,
         ephemeral_root: Digest,
         rcv: &[u8],
         kind_table: Vec<KindTableEntry>,
     ) -> ComplianceWitness {
         ComplianceWitness {
-            consumed_data: consumed_data.to_vec(),
-            created_resources: created_resources.to_vec(),
+            consumed_data,
+            created_resources,
             ephemeral_root,
             rcv: rcv.to_vec(),
             kind_table,
