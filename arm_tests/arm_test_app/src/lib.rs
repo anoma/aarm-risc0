@@ -150,8 +150,8 @@ impl Tester {
 
         init_test_kind_table();
         let compliance_witness = ComplianceWitness::from_resources(
-            &self.consumed_data[self.current],
-            &self.created_resources[self.current],
+            self.consumed_data[self.current].clone(),
+            self.created_resources[self.current].clone(),
             global_kind_table().to_vec(),
         );
         self.rcvs.push(compliance_witness.rcv.clone());
@@ -683,8 +683,8 @@ fn test_invalid_created_nonce_rejected() {
 
     init_test_kind_table();
     let witness = ComplianceWitness::from_resources(
-        &tester.consumed_data[0],
-        &tester.created_resources[0],
+        tester.consumed_data[0].clone(),
+        tester.created_resources[0].clone(),
         global_kind_table().to_vec(),
     );
 
