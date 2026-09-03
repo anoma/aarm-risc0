@@ -1,10 +1,6 @@
 //! Constants for compliance and padding logic proving and verification keys.
 
-use crate::{
-    compliance::KindTableEntry,
-    error::ArmError,
-    resource::{generate_resource_kind, Resource},
-};
+use crate::{compliance::KindTableEntry, error::ArmError};
 use hex::FromHex;
 use lazy_static::lazy_static;
 use risc0_zkvm::{
@@ -50,35 +46,41 @@ lazy_static! {
 }
 
 /// Global kind table and its SHA-256 commitment, loaded once from a JSON file.
-static GLOBAL_KIND_TABLE: OnceLock<(Vec<KindTableEntry>, Digest)> = OnceLock::new();
+static KIND_TABLE: OnceLock<(Vec<KindTableEntry>, Digest)> = OnceLock::new();
 
 /// JSON-serializable representation of a kind table entry.
-/// `logic_ref` and `label_ref` are lowercase hex strings.
+/// All fields are lowercase hex strings. `kind_point` is an uncompressed
+/// SEC1-encoded secp256k1 point (65 bytes = 130 hex chars).
 #[derive(serde::Serialize, serde::Deserialize)]
 struct KindTableJsonEntry {
     logic_ref: String,
     label_ref: String,
+    kind_point: String,
+    /// Ignored by the loader; present for human readability.
+    #[serde(default, rename = "_comment")]
+    _comment: String,
 }
 
 /// Initializes the global kind table from a JSON file.
 ///
-/// The file must contain a JSON array of objects with `logic_ref` and
-/// `label_ref` (hex-encoded `Digest` values). The kind point for each entry
-/// is derived via `Resource::kind()` (hash-to-curve) at load time, rather
-/// than being read from the file, so the table can't drift out of sync with
-/// its keys. Calling this a second time is a no-op; the first call wins.
+/// The file must contain a JSON array of objects with `logic_ref`, `label_ref`,
+/// and `kind_point` (all lowercase hex). The kind point is read directly from
+/// the file; no hash-to-curve is performed at load time. An optional `_comment`
+/// field is accepted and ignored.
+/// Calling this a second time is a no-op; the first call wins.
 ///
 /// # Example JSON
 /// ```json
 /// [
 ///   {
 ///     "logic_ref": "aabbcc...",
-///     "label_ref":  "ddeeff..."
+///     "label_ref":  "ddeeff...",
+///     "kind_point": "04..."
 ///   }
 /// ]
 /// ```
 pub fn init_kind_table_from_file(path: &Path) -> Result<(), ArmError> {
-    if GLOBAL_KIND_TABLE.get().is_some() {
+    if KIND_TABLE.get().is_some() {
         return Ok(());
     }
     let content = std::fs::read_to_string(path).map_err(|_| ArmError::KindTableLoadFailed)?;
@@ -91,22 +93,40 @@ pub fn init_kind_table_from_file(path: &Path) -> Result<(), ArmError> {
                 Digest::from_hex(&e.logic_ref).map_err(|_| ArmError::KindTableLoadFailed)?;
             let label_ref =
                 Digest::from_hex(&e.label_ref).map_err(|_| ArmError::KindTableLoadFailed)?;
-            let point = generate_resource_kind(logic_ref, label_ref)
-                .map_err(|_| ArmError::KindTableLoadFailed)?;
-            Ok(KindTableEntry::new(logic_ref, label_ref, &point))
+            let kind_point =
+                hex::decode(&e.kind_point).map_err(|_| ArmError::KindTableLoadFailed)?;
+            Ok(KindTableEntry {
+                logic_ref,
+                label_ref,
+                kind_point,
+            })
         })
         .collect::<Result<Vec<_>, _>>()?;
+    install_kind_table(entries)
+}
+
+/// Initializes the global kind table from a pre-built list of entries.
+///
+/// Useful for tests or callers that construct entries programmatically without
+/// a JSON file. Calling this a second time is a no-op; the first call wins.
+pub fn init_kind_table_from_entries(entries: Vec<KindTableEntry>) -> Result<(), ArmError> {
+    if KIND_TABLE.get().is_some() {
+        return Ok(());
+    }
+    install_kind_table(entries)
+}
+
+fn install_kind_table(entries: Vec<KindTableEntry>) -> Result<(), ArmError> {
     let hash = hash_kind_table_entries(&entries);
-    // First call wins; a race between two threads is benign — one loses the
-    // set and returns Ok(()) with whichever table was installed first.
-    let _ = GLOBAL_KIND_TABLE.set((entries, hash));
+    // First call wins; a race between two threads is benign.
+    let _ = KIND_TABLE.set((entries, hash));
     Ok(())
 }
 
 /// Returns the currently loaded global kind table (empty slice if not yet
 /// initialised).
-pub fn global_kind_table() -> &'static [KindTableEntry] {
-    GLOBAL_KIND_TABLE.get().map_or(&[], |(entries, _)| entries)
+pub fn kind_table() -> &'static [KindTableEntry] {
+    KIND_TABLE.get().map_or(&[], |(entries, _)| entries)
 }
 
 /// Returns the SHA-256 commitment to the global kind table, or `None` if the
@@ -115,8 +135,8 @@ pub fn global_kind_table() -> &'static [KindTableEntry] {
 /// The commitment is computed using the same algorithm as
 /// `ComplianceWitness::hash_kind_table`: SHA-256 over the concatenated
 /// `(logic_ref ‖ label_ref ‖ kind_point)` bytes of every entry in order.
-pub fn global_kind_table_hash() -> Option<&'static Digest> {
-    GLOBAL_KIND_TABLE.get().map(|(_, hash)| hash)
+pub fn kind_table_hash() -> Option<&'static Digest> {
+    KIND_TABLE.get().map(|(_, hash)| hash)
 }
 
 fn hash_kind_table_entries(entries: &[KindTableEntry]) -> Digest {
@@ -129,17 +149,22 @@ fn hash_kind_table_entries(entries: &[KindTableEntry]) -> Digest {
     *ShaImpl::hash_bytes(&bytes)
 }
 
-/// Looks up `resource` in `table` and returns its pre-computed kind point, or
-/// falls back to `hash_to_curve`.
-pub fn kind_entry_for(table: &[KindTableEntry], resource: &Resource) -> Option<KindTableEntry> {
-    table
-        .iter()
-        .find(|e| e.logic_ref == resource.logic_ref && e.label_ref == resource.label_ref)
-        .cloned()
-        .or_else(|| {
-            resource
-                .kind()
-                .ok()
-                .map(|p| KindTableEntry::new(resource.logic_ref, resource.label_ref, &p))
-        })
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn print_kind_table_hash() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("data/kind_table.json");
+        init_kind_table_from_file(&path).expect("failed to load kind table");
+        let hash = kind_table_hash().expect("kind table not initialised");
+        println!("kind_table_hash: {hash:?}");
+        println!(
+            "hex: {}",
+            hash.as_bytes()
+                .iter()
+                .map(|b| format!("{b:02x}"))
+                .collect::<String>()
+        );
+    }
 }

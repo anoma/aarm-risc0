@@ -29,7 +29,7 @@
 /// RISC0_DEV_MODE=1 cargo bench --features prove -p compliance
 /// ```
 use anoma_rm_risc0::compliance::{ComplianceWitness, INITIAL_ROOT};
-use anoma_rm_risc0::constants::{global_kind_table, init_kind_table_from_file};
+use anoma_rm_risc0::constants::{init_kind_table_from_file, kind_table};
 use anoma_rm_risc0::nullifier_key::NullifierKey;
 use anoma_rm_risc0::resource::{ConsumedResourceWitness, Resource};
 use compliance_methods::COMPLIANCE_GUEST_ELF;
@@ -99,7 +99,7 @@ fn make_witness(logic_ref: Digest, label_ref: Digest, count: usize) -> Complianc
         created_resources,
         ephemeral_root: *INITIAL_ROOT,
         rcv: [vec![0u8; 31], vec![1u8]].concat(),
-        kind_table: global_kind_table().to_vec(),
+        kind_table: kind_table().to_vec(),
     }
 }
 
@@ -130,7 +130,7 @@ fn bench_file_table(c: &mut Criterion) {
         std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../arm/data/kind_table.json");
     init_kind_table_from_file(&kind_table_path).expect("Failed to load kind_table.json");
 
-    let entry = &global_kind_table()[0];
+    let entry = &kind_table()[0];
     let logic_ref = entry.logic_ref;
     let label_ref = entry.label_ref;
 

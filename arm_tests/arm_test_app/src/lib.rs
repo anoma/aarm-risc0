@@ -7,7 +7,7 @@ use anoma_rm_risc0::{
     action_tree::ActionTree,
     compliance::ComplianceWitness,
     compliance_unit::ComplianceUnit,
-    constants::{global_kind_table, init_kind_table_from_file},
+    constants::{init_kind_table_from_file, kind_table},
     delta_proof::DeltaWitness,
     error::ArmError,
     logic_proof::{LogicProver, LogicVerifier},
@@ -21,6 +21,7 @@ use anoma_rm_risc0::{
 #[cfg(test)]
 use anoma_rm_risc0::{
     compliance::ComplianceInstance,
+    constants::kind_table_hash,
     proving_system::{instance_to_journal, journal_to_instance},
 };
 use anoma_rm_risc0_test_witness::TestLogicWitness;
@@ -152,7 +153,7 @@ impl Tester {
         let compliance_witness = ComplianceWitness::from_resources(
             self.consumed_data[self.current].clone(),
             self.created_resources[self.current].clone(),
-            global_kind_table().to_vec(),
+            kind_table().to_vec(),
         );
         self.rcvs.push(compliance_witness.rcv.clone());
 
@@ -299,7 +300,7 @@ fn test_transaction() {
     let balanced_tx = Tester::default()
         .generate_test_transaction(&[(2, 1), (1, 2)])
         .unwrap();
-    assert!(balanced_tx.verify().is_ok())
+    assert!(balanced_tx.verify(*kind_table_hash().unwrap()).is_ok())
 }
 
 #[test]
@@ -307,7 +308,7 @@ fn test_unbalanced_tx_fails_to_verify() {
     let unbalanced_tx = Tester::default()
         .generate_test_transaction(&[(2, 1), (1, 1)])
         .unwrap();
-    assert!(unbalanced_tx.verify().is_err())
+    assert!(unbalanced_tx.verify(*kind_table_hash().unwrap()).is_err())
 }
 
 #[test]
@@ -361,7 +362,9 @@ fn test_kind_table_commitment_check_accepts_global_commitment() {
     let tx = Tester::default()
         .generate_test_transaction(&[(1, 1)])
         .unwrap();
-    assert!(tx.kind_table_commitment_check().is_ok());
+    assert!(tx
+        .kind_table_commitment_check(*kind_table_hash().unwrap())
+        .is_ok());
 }
 
 /// One action has a different commitment from the other — cross-action
@@ -378,7 +381,7 @@ fn test_kind_table_commitment_check_rejects_mismatched_actions() {
     );
 
     assert!(matches!(
-        tx.kind_table_commitment_check(),
+        tx.kind_table_commitment_check(*kind_table_hash().unwrap()),
         Err(ArmError::KindTableCommitmentMismatch)
     ));
 }
@@ -397,7 +400,7 @@ fn test_kind_table_commitment_check_rejects_consistent_non_global() {
     set_action_kind_table_commitment(&mut actions[1], fake);
 
     assert!(matches!(
-        tx.kind_table_commitment_check(),
+        tx.kind_table_commitment_check(*kind_table_hash().unwrap()),
         Err(ArmError::KindTableGlobalMismatch)
     ));
 }
@@ -416,7 +419,7 @@ fn test_kind_table_commitment_check_rejects_global_mismatch() {
     );
 
     assert!(matches!(
-        tx.kind_table_commitment_check(),
+        tx.kind_table_commitment_check(*kind_table_hash().unwrap()),
         Err(ArmError::KindTableGlobalMismatch)
     ));
 }
@@ -433,7 +436,7 @@ fn test_aggregation_works() {
     assert!(tx_str.aggregation.is_some());
     assert!(tx_str.verify_aggregation().is_ok());
     // Full verify() must also succeed on the post-aggregation transaction.
-    assert!(tx_str.verify().is_ok());
+    assert!(tx_str.verify(*kind_table_hash().unwrap()).is_ok());
 
     // Tamper the compliance_key in the decoded instance — the receipt is still
     // valid against BATCH_AGGREGATION_VK, but the compliance_key check must
@@ -550,7 +553,7 @@ fn test_verify_rejects_transaction_with_both_actions_and_aggregation() {
         Err(ArmError::AmbiguousTransactionRepresentation)
     );
     assert_eq!(
-        tx.verify(),
+        tx.verify(Digest::from([0u8; 32])),
         Err(ArmError::AmbiguousTransactionRepresentation)
     );
 }
@@ -589,7 +592,7 @@ fn test_compose_transactions() {
         .unwrap()
         .generate_delta_proof()
         .unwrap();
-    assert!(composed.verify().is_ok());
+    assert!(composed.verify(*kind_table_hash().unwrap()).is_ok());
 }
 
 /// `compose()` must reject any input that carries both `actions` and
@@ -685,7 +688,7 @@ fn test_invalid_created_nonce_rejected() {
     let witness = ComplianceWitness::from_resources(
         tester.consumed_data[0].clone(),
         tester.created_resources[0].clone(),
-        global_kind_table().to_vec(),
+        kind_table().to_vec(),
     );
 
     assert!(matches!(
