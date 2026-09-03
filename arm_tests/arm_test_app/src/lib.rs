@@ -367,6 +367,23 @@ fn test_kind_table_commitment_check_accepts_global_commitment() {
         .is_ok());
 }
 
+/// All actions carry a non-global commitment and the caller supplies that same
+/// digest as `expected` — the check must succeed. This guards against a
+/// regression back to an implicit global-table lookup.
+#[test]
+fn test_kind_table_commitment_check_accepts_explicit_non_global_commitment() {
+    let mut tx = Tester::default()
+        .generate_test_transaction(&[(1, 1), (1, 1)])
+        .unwrap();
+
+    let fake = Digest::from([0xAB; 32]);
+    let actions = tx.actions.as_mut().unwrap();
+    set_action_kind_table_commitment(&mut actions[0], fake);
+    set_action_kind_table_commitment(&mut actions[1], fake);
+
+    assert!(tx.kind_table_commitment_check(fake).is_ok());
+}
+
 /// One action has a different commitment from the other — cross-action
 /// consistency check must fire before the global check.
 #[test]
@@ -387,7 +404,8 @@ fn test_kind_table_commitment_check_rejects_mismatched_actions() {
 }
 
 /// Both actions agree on a fake commitment — cross-action check passes but the
-/// global check must catch the mismatch.
+/// global check must catch the mismatch. Also asserts that passing the fake
+/// commitment explicitly succeeds, covering the multi-chain case.
 #[test]
 fn test_kind_table_commitment_check_rejects_consistent_non_global() {
     let mut tx = Tester::default()
@@ -399,9 +417,13 @@ fn test_kind_table_commitment_check_rejects_consistent_non_global() {
     set_action_kind_table_commitment(&mut actions[0], fake);
     set_action_kind_table_commitment(&mut actions[1], fake);
 
+    // Caller-provided commitment matching the tx must succeed.
+    assert!(tx.kind_table_commitment_check(fake).is_ok());
+
+    // Passing a different (global) commitment must be rejected.
     assert!(matches!(
         tx.kind_table_commitment_check(*kind_table_hash().unwrap()),
-        Err(ArmError::KindTableGlobalMismatch)
+        Err(ArmError::KindTableCommitmentExpectedMismatch)
     ));
 }
 
@@ -420,7 +442,7 @@ fn test_kind_table_commitment_check_rejects_global_mismatch() {
 
     assert!(matches!(
         tx.kind_table_commitment_check(*kind_table_hash().unwrap()),
-        Err(ArmError::KindTableGlobalMismatch)
+        Err(ArmError::KindTableCommitmentExpectedMismatch)
     ));
 }
 

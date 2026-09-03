@@ -117,9 +117,29 @@ pub fn init_kind_table_from_entries(entries: Vec<KindTableEntry>) -> Result<(), 
 }
 
 fn install_kind_table(entries: Vec<KindTableEntry>) -> Result<(), ArmError> {
+    for entry in &entries {
+        validate_kind_point(&entry.kind_point)?;
+    }
     let hash = hash_kind_table_entries(&entries);
     // First call wins; a race between two threads is benign.
     let _ = KIND_TABLE.set((entries, hash));
+    Ok(())
+}
+
+/// Validates that `bytes` is a well-formed uncompressed SEC1 secp256k1 point:
+/// 65 bytes, leading 0x04 byte, and on the curve.
+fn validate_kind_point(bytes: &[u8]) -> Result<(), ArmError> {
+    use k256::{elliptic_curve::sec1::FromEncodedPoint, EncodedPoint, ProjectivePoint};
+    if bytes.len() != 65 || bytes[0] != 0x04 {
+        return Err(ArmError::KindTableLoadFailed);
+    }
+    let encoded = EncodedPoint::from_bytes(bytes).map_err(|_| ArmError::KindTableLoadFailed)?;
+    if ProjectivePoint::from_encoded_point(&encoded)
+        .is_none()
+        .into()
+    {
+        return Err(ArmError::KindTableLoadFailed);
+    }
     Ok(())
 }
 
@@ -154,6 +174,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[ignore = "developer utility: mutates global KIND_TABLE, run in isolation with --include-ignored"]
     fn print_kind_table_hash() {
         let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("data/kind_table.json");
         init_kind_table_from_file(&path).expect("failed to load kind table");

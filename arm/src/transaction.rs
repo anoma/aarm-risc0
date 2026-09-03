@@ -104,8 +104,9 @@ impl Transaction {
     /// Verifies all the proofs and corresponding checks in the transaction.
     ///
     /// `kind_table_commitment` is the expected SHA-256 commitment of the kind
-    /// table for the target chain. Pass `*kind_table_hash().unwrap()`
-    /// when verifying against the loaded global table.
+    /// table for the target chain. Callers that use the loaded global table
+    /// should obtain it via `kind_table_hash()` and propagate the `None` case
+    /// as an error rather than panicking.
     pub fn verify(&self, kind_table_commitment: Digest) -> Result<(), ArmError> {
         // A transaction must carry exactly one representation. Rejecting the
         // "both present" case here prevents a crafted transaction from
@@ -186,7 +187,7 @@ impl Transaction {
         };
 
         if commitment != expected {
-            return Err(ArmError::KindTableGlobalMismatch);
+            return Err(ArmError::KindTableCommitmentExpectedMismatch);
         }
         Ok(())
     }
