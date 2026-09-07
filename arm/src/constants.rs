@@ -24,25 +24,25 @@ pub const BATCH_AGGREGATION_EVM_PK: &[u8] =
 lazy_static! {
     /// compliance verification key / compliance image id
     pub static ref COMPLIANCE_VK: Digest =
-        Digest::from_hex("7b657df4c7ee3ef8592894761aefc80f196e5b97dd27d43a98628b2ce2ef91f0")
+        Digest::from_hex("6a09c1ab13338d0361eb867468280aae67541e5aecc7a3bd4f885a7e189e3049")
             .unwrap();
 
     /// padding logic verification key / padding image id
     pub static ref PADDING_LOGIC_VK: Digest =
-        Digest::from_hex("034c170fc2045f5e257110eb369e57ea5dc72d6dd83dab69746afc2bec6e1847")
+        Digest::from_hex("7421e29e44360f11f05c1c754aa47830b0363f9d1cd23d02ba9364c2b521a4e1")
             .unwrap();
 }
 
 #[cfg(feature = "aggregation")]
 lazy_static! {
     /// Batch aggregation verification key / Batch aggregation image id.
-    pub static ref BATCH_AGGREGATION_VK: Digest = Digest::from_hex("9557c17ec8607f788e184991363992233c28a7d7013605579baa7145815f5497").unwrap();
+    pub static ref BATCH_AGGREGATION_VK: Digest = Digest::from_hex("6df7924211cfb7aacc654795cbc94e12b54a4bccecf3ed4d299e9ed3ef6a23c3").unwrap();
 }
 
 #[cfg(all(feature = "aggregation", feature = "abi_encoding"))]
 lazy_static! {
     /// Batch aggregation (EVM ABI-encoded output) verification key / image id.
-    pub static ref BATCH_AGGREGATION_EVM_VK: Digest = Digest::from_hex("a46d8bf487ebfdbe1d611a766b6a3fcb2884d2f226b3ce629f2bf25c411bce91").unwrap();
+    pub static ref BATCH_AGGREGATION_EVM_VK: Digest = Digest::from_hex("e639f52655d936a44444b49dcf8d446b3c0a72f79f2354476faad70d1f234e8e").unwrap();
 }
 
 /// Global kind table and its SHA-256 commitment, loaded once from a JSON file.
@@ -172,6 +172,33 @@ fn hash_kind_table_entries(entries: &[KindTableEntry]) -> Digest {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    #[ignore = "developer utility: computes kind points for (logic_ref, zero label_ref) pairs"]
+    fn print_kind_points_for_vks() {
+        use crate::resource::generate_resource_kind;
+        use k256::elliptic_curve::sec1::ToEncodedPoint;
+        use risc0_zkvm::sha::DIGEST_BYTES;
+
+        let zero_label = Digest::from([0u8; DIGEST_BYTES]);
+        let vks = [
+            (
+                "PADDING_LOGIC_VK",
+                "7421e29e44360f11f05c1c754aa47830b0363f9d1cd23d02ba9364c2b521a4e1",
+            ),
+            (
+                "TEST_LOGIC_VK",
+                "13e116647f6776a264dc2a29f044bd6e03a7c6df4d56dc9d981a2df8f3c69949",
+            ),
+        ];
+        for (name, hex_vk) in vks {
+            let bytes: [u8; 32] = hex::decode(hex_vk).unwrap().try_into().unwrap();
+            let logic_ref = Digest::from(bytes);
+            let point = generate_resource_kind(logic_ref, zero_label).unwrap();
+            let encoded = point.to_encoded_point(false);
+            println!("{name}: {}", hex::encode(encoded.as_bytes()));
+        }
+    }
 
     #[test]
     #[ignore = "developer utility: mutates global KIND_TABLE, run in isolation with --include-ignored"]
