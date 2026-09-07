@@ -37,8 +37,8 @@ thiserror = "2.0.6"
 
 [features]
 default = ["transaction", "prove"]
-transaction = ["compliance_circuit", "dep:sha3"]
-compliance_circuit = []
+transaction = ["conformance_circuit", "dep:sha3"]
+conformance_circuit = []
 prove = ["risc0-zkvm/prove"]
 bonsai = ["risc0-zkvm/bonsai"]
 cuda = ["risc0-zkvm/cuda"]

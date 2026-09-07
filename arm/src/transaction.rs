@@ -12,7 +12,7 @@ use crate::constants::BATCH_AGGREGATION_EVM_VK;
 ))]
 use crate::constants::BATCH_AGGREGATION_PK;
 #[cfg(feature = "aggregation")]
-use crate::constants::COMPLIANCE_VK;
+use crate::constants::CONFORMANCE_VK;
 #[cfg(all(feature = "aggregation", feature = "prove"))]
 use crate::{
     aggregation_witness::{ActionWitness, AggregationWitness},
@@ -28,7 +28,7 @@ use risc0_zkvm::{Digest, InnerReceipt};
 
 use crate::{
     action::Action,
-    compliance_unit::ComplianceUnit,
+    conformance_unit::ConformanceUnit,
     delta_proof::{DeltaInstance, DeltaProof, DeltaWitness},
     error::ArmError,
     logic_proof::LogicVerifier,
@@ -174,9 +174,12 @@ impl Transaction {
             let Some(first) = iter.next() else {
                 return Ok(());
             };
-            let tx_commitment = first.compliance_unit.get_instance()?.kind_table_commitment;
+            let tx_commitment = first.conformance_unit.get_instance()?.kind_table_commitment;
             for action in iter {
-                let commitment = action.compliance_unit.get_instance()?.kind_table_commitment;
+                let commitment = action
+                    .conformance_unit
+                    .get_instance()?
+                    .kind_table_commitment;
                 if commitment != tx_commitment {
                     return Err(ArmError::KindTableCommitmentMismatch);
                 }
@@ -209,8 +212,8 @@ impl Transaction {
             }
         } else if let Some(actions) = &self.actions {
             for action in actions {
-                let compliance_instance = action.compliance_unit.get_instance()?;
-                for consumed_nullifier in compliance_instance
+                let conformance_instance = action.conformance_unit.get_instance()?;
+                for consumed_nullifier in conformance_instance
                     .consumed_publics
                     .iter()
                     .map(|r| r.resource_nullifier)
@@ -303,23 +306,23 @@ impl Transaction {
     }
 
     /// Returns all compliance units in the transaction.
-    pub fn get_compliance_units(&self) -> Vec<&ComplianceUnit> {
+    pub fn get_conformance_units(&self) -> Vec<&ConformanceUnit> {
         self.actions
             .as_deref()
             .unwrap_or(&[])
             .iter()
-            .map(|a| &a.compliance_unit)
+            .map(|a| &a.conformance_unit)
             .collect()
     }
 
     /// Returns all compliance inner receipts in the transaction.
-    pub fn get_compliance_inner_receipts(&self) -> Result<Vec<InnerReceipt>, ArmError> {
-        let mut compliance_inner_receipts = Vec::new();
-        for cu in self.get_compliance_units() {
+    pub fn get_conformance_inner_receipts(&self) -> Result<Vec<InnerReceipt>, ArmError> {
+        let mut conformance_inner_receipts = Vec::new();
+        for cu in self.get_conformance_units() {
             let inner_receipt = cu.get_inner_receipt()?;
-            compliance_inner_receipts.push(inner_receipt);
+            conformance_inner_receipts.push(inner_receipt);
         }
-        Ok(compliance_inner_receipts)
+        Ok(conformance_inner_receipts)
     }
 
     /// Returns all logic inner receipts in the transaction.
@@ -336,9 +339,9 @@ impl Transaction {
     }
 
     /// Returns all compliance instances in the transaction.
-    pub fn get_compliance_instances(&self) -> Vec<Vec<u8>> {
+    pub fn get_conformance_instances(&self) -> Vec<Vec<u8>> {
         let mut result = Vec::new();
-        for cu in self.get_compliance_units() {
+        for cu in self.get_conformance_units() {
             result.push(cu.instance.clone());
         }
         result
@@ -392,19 +395,19 @@ impl Transaction {
         let mut action_witnesses = Vec::with_capacity(actions.len());
 
         for action in actions {
-            let compliance_instance = action.compliance_unit.get_instance()?;
-            env_builder.add_assumption(action.compliance_unit.get_inner_receipt()?);
+            let conformance_instance = action.conformance_unit.get_instance()?;
+            env_builder.add_assumption(action.conformance_unit.get_inner_receipt()?);
 
             // Positional matching: logic_verifier_inputs must be in canonical
             // tag order (consumed nullifiers then created commitments), which is
-            // the same order ComplianceInstance::tags() produces. This mirrors
+            // the same order ConformanceInstance::tags() produces. This mirrors
             // Action::get_logic_verifiers and avoids the silent overwrite that
             // a HashMap would cause when duplicate tags are present.
-            let tags: Vec<Digest> = compliance_instance.tags().collect();
+            let tags: Vec<Digest> = conformance_instance.tags().collect();
             if tags.len() != action.logic_verifier_inputs.len() {
                 return Err(ArmError::TagNotFound);
             }
-            let n_consumed = compliance_instance.consumed_publics.len();
+            let n_consumed = conformance_instance.consumed_publics.len();
             let (consumed_lvis, created_lvis) = action.logic_verifier_inputs.split_at(n_consumed);
 
             let mut consumed_app_data = Vec::with_capacity(n_consumed);
@@ -417,7 +420,7 @@ impl Transaction {
             }
 
             let mut created_app_data =
-                Vec::with_capacity(compliance_instance.created_publics.len());
+                Vec::with_capacity(conformance_instance.created_publics.len());
             for (lvi, tag) in created_lvis.iter().zip(&tags[n_consumed..]) {
                 if lvi.tag != *tag {
                     return Err(ArmError::TagNotFound);
@@ -427,14 +430,14 @@ impl Transaction {
             }
 
             action_witnesses.push(ActionWitness {
-                compliance_instance,
+                conformance_instance,
                 consumed_app_data,
                 created_app_data,
             });
         }
 
         let witnesses = AggregationWitness {
-            compliance_key: *COMPLIANCE_VK,
+            conformance_key: *CONFORMANCE_VK,
             actions: action_witnesses,
         };
 
@@ -517,9 +520,9 @@ impl Transaction {
             ArmError::ProofVerificationFailed(format!("Proof verification failed: {}", err))
         })?;
 
-        if agg.instance.compliance_key != *COMPLIANCE_VK {
+        if agg.instance.conformance_key != *CONFORMANCE_VK {
             return Err(ArmError::ProofVerificationFailed(
-                "aggregation compliance_key does not match expected COMPLIANCE_VK".into(),
+                "aggregation conformance_key does not match expected CONFORMANCE_VK".into(),
             ));
         }
 

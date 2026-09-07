@@ -7,7 +7,7 @@
 //!
 //! Only data that is not already present in the compliance instance is included
 //! here.  Specifically, each [`ActionWitness`] carries the typed
-//! [`ComplianceInstance`] (from which the guest derives tags,
+//! [`ConformanceInstance`] (from which the guest derives tags,
 //! `resource_logic_ref` values, and the action-tree root in-circuit) together
 //! with the per-resource [`AppData`] values — the only information that the
 //! compliance instance does not contain.
@@ -22,7 +22,7 @@
 //! | B – root matches action-tree root    | root recomputed in-circuit from compliance tags |
 //! | C – VK matches `resource_logic_ref`  | `resource_logic_ref` used directly as the `env::verify` key |
 
-use crate::{compliance::ComplianceInstance, logic_instance::AppData};
+use crate::{conformance::ConformanceInstance, logic_instance::AppData};
 use risc0_zkvm::Digest;
 use serde::{Deserialize, Serialize};
 
@@ -30,7 +30,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize)]
 pub struct AggregationWitness {
     /// Verification key of the compliance circuit.
-    pub compliance_key: Digest,
+    pub conformance_key: Digest,
     /// One witness per action, in the order they appear in the transaction.
     pub actions: Vec<ActionWitness>,
 }
@@ -45,11 +45,11 @@ pub struct AggregationWitness {
 #[derive(Serialize, Deserialize)]
 pub struct ActionWitness {
     /// Typed compliance instance for this action.
-    pub compliance_instance: ComplianceInstance,
+    pub conformance_instance: ConformanceInstance,
     /// `app_data` for each consumed resource, in the same order as
-    /// `compliance_instance.consumed_publics`.
+    /// `conformance_instance.consumed_publics`.
     pub consumed_app_data: Vec<AppData>,
     /// `app_data` for each created resource, in the same order as
-    /// `compliance_instance.created_publics`.
+    /// `conformance_instance.created_publics`.
     pub created_app_data: Vec<AppData>,
 }

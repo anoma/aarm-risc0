@@ -93,7 +93,7 @@ export BONSAI_API_KEY=<YOUR_API_KEY>
 
 ### Benchmark
 
-- [Compliance circuit benchmark](./arm_circuits/compliance/README.md)
+- [Compliance circuit benchmark](./arm_circuits/conformance/README.md)
 
 ## Feature flags
 
@@ -101,8 +101,8 @@ We have the following feature flags in arm lib:
 
 | Feature                 | Implies                              | Description                                                                                                                                        |
 | ----------------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `compliance_circuit`    |                                      | A specific feature for compliance circuit                                                                                                          |
-| `transaction (default)` | `compliance_circuit`                 | It provides full transaction processing capabilities and supports Succinct(STARK) and Groth16 proof types. Groth16 proofs require x86_64 machines. |
+| `conformance_circuit`    |                                      | A specific feature for compliance circuit                                                                                                          |
+| `transaction (default)` | `conformance_circuit`                 | It provides full transaction processing capabilities and supports Succinct(STARK) and Groth16 proof types. Groth16 proofs require x86_64 machines. |
 | `prove (default)`       |                                      | Enables RISC0 proving capabilities (required for actual proof generation)                                                                          |
 | `bonsai`                |                                      | Enables RISC0 bonsai sdk                                                                                                                           |
 | `cuda`                  |                                      | Enables CUDA GPU acceleration for the prover. Requires CUDA toolkit to be installed.                                                               |
@@ -129,7 +129,7 @@ You may generate different ELFs and ImageIDs on different machines and environme
 For example, build the compliance circuit in RM:
 
 ```bash
-cargo risczero build --manifest-path arm_circuits/compliance/methods/guest/Cargo.toml
+cargo risczero build --manifest-path arm_circuits/conformance/methods/guest/Cargo.toml
 ```
 
 will reproduce the output to:
@@ -139,7 +139,7 @@ View build details: docker-desktop://dashboard/build/desktop-linux/desktop-linux
 
 ELFs ready at:
 ImageID: 5d3ea0a27561e9e66e6a7c12c7022d1a814a0724d13f7f8e083c4b4f14b5f1c7 -
-arm-risc0/arm_circuits/compliance/methods/guest/target/riscv32im-risc0-zkvm-elf/docker/compliance-guest.bin
+arm-risc0/arm_circuits/conformance/methods/guest/target/riscv32im-risc0-zkvm-elf/docker/conformance-guest.bin
 ```
 
 Note: The `unstable` feature of `risc0-zkvm` currently causes issues in circuits. This can be temporarily fixed by manually updating the tool. The problem will be fully resolved in the next release of RISC Zero.

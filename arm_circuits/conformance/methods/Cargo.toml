@@ -1,5 +1,5 @@
 [package]
-name = "compliance-methods"
+name = "conformance-methods"
 version = "1.0.0"
 edition = "2021"
 

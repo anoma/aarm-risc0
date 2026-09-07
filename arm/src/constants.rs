@@ -1,6 +1,6 @@
 //! Constants for compliance and padding logic proving and verification keys.
 
-use crate::{compliance::KindTableEntry, error::ArmError};
+use crate::{conformance::KindTableEntry, error::ArmError};
 use hex::FromHex;
 use lazy_static::lazy_static;
 use risc0_zkvm::{
@@ -10,7 +10,7 @@ use risc0_zkvm::{
 use std::{path::Path, sync::OnceLock};
 
 /// Compliance proving key / compliance guest ELF binary
-pub const COMPLIANCE_PK: &[u8] = include_bytes!("../elfs/compliance-guest.bin");
+pub const CONFORMANCE_PK: &[u8] = include_bytes!("../elfs/conformance-guest.bin");
 /// Padding logic proving key / padding logic guest ELF binary
 pub const PADDING_LOGIC_PK: &[u8] = include_bytes!("../elfs/trivial-logic-guest.bin");
 /// Batch aggregation proving key / batch aggregation guest ELF binary
@@ -23,7 +23,7 @@ pub const BATCH_AGGREGATION_EVM_PK: &[u8] =
 
 lazy_static! {
     /// compliance verification key / compliance image id
-    pub static ref COMPLIANCE_VK: Digest =
+    pub static ref CONFORMANCE_VK: Digest =
         Digest::from_hex("7b657df4c7ee3ef8592894761aefc80f196e5b97dd27d43a98628b2ce2ef91f0")
             .unwrap();
 
@@ -153,7 +153,7 @@ pub fn kind_table() -> &'static [KindTableEntry] {
 /// table has not been initialised yet.
 ///
 /// The commitment is computed using the same algorithm as
-/// `ComplianceWitness::hash_kind_table`: SHA-256 over the concatenated
+/// `ConformanceWitness::hash_kind_table`: SHA-256 over the concatenated
 /// `(logic_ref ‖ label_ref ‖ kind_point)` bytes of every entry in order.
 pub fn kind_table_hash() -> Option<&'static Digest> {
     KIND_TABLE.get().map(|(_, hash)| hash)

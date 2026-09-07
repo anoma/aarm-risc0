@@ -51,7 +51,7 @@ pub enum ArmError {
     #[error("Proof verification failed with return code {0}")]
     ProofVerificationFailed(String),
     #[error("Invalid compliance instance")]
-    InvalidComplianceInstance,
+    InvalidConformanceInstance,
     #[error("Delta proof generation failed")]
     DeltaProofGenerationFailed,
     #[error("Invalid Random Commitment Value")]

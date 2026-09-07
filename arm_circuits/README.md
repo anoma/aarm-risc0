@@ -6,7 +6,7 @@ Demonstration circuits for the Anoma Resource Machine (ARM) built on RISC0 zkVM.
 
 This workspace includes circuit crates and their corresponding RISC0 method builds:
 
-- [arm_circuits/compliance](arm_circuits/compliance): Basic compliance checking circuit and method generation
+- [arm_circuits/conformance](arm_circuits/conformance): Basic conformance checking circuit and method generation
 - [arm_circuits/trivial_logic](arm_circuits/trivial_logic): Minimal logic circuit example (also used for padding resources)
 - [arm_circuits/logic_test](arm_circuits/logic_test): Test logic circuit used by the test app and SDK bindings
 - [arm_circuits/batch_aggregation](arm_circuits/batch_aggregation): Single-run batch aggregation methods
@@ -36,7 +36,7 @@ Requires Docker (used by `cargo risczero build` for reproducible builds) and
 Run from the repository root to generate guest ELFs and image IDs reproducibly:
 
 ```bash
-cargo risczero build --manifest-path arm_circuits/compliance/methods/guest/Cargo.toml
+cargo risczero build --manifest-path arm_circuits/conformance/methods/guest/Cargo.toml
 
 cargo risczero build --manifest-path arm_circuits/trivial_logic/methods/guest/Cargo.toml
 

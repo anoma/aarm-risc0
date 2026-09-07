@@ -30,7 +30,7 @@ lazy_static! {
 
 /// The compliance instance contains all public inputs to the compliance proof.
 #[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
-pub struct ComplianceInstance {
+pub struct ConformanceInstance {
     /// Public information of consumed resources
     pub consumed_publics: Vec<ConsumedResourcePublic>,
     /// Public information of created resources
@@ -70,7 +70,7 @@ impl KindTableEntry {
 
 /// The compliance witness contains all private inputs to the compliance proof.
 #[derive(Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
-pub struct ComplianceWitness {
+pub struct ConformanceWitness {
     /// Private information of consumed resources
     pub consumed_data: Vec<ConsumedResourceWitness>,
     /// Private information of created resources
@@ -88,7 +88,7 @@ pub struct ComplianceWitness {
     // pub output_resource_logic_cm_r: [u8; DATA_BYTES],
 }
 
-impl ComplianceWitness {
+impl ConformanceWitness {
     /// Creates a new compliance witness from the given resources. It uses the
     /// initial root for ephemeral resources.
     pub fn from_resources(
@@ -132,8 +132,8 @@ impl ComplianceWitness {
         ephemeral_root: Digest,
         rcv: &[u8],
         kind_table: Vec<KindTableEntry>,
-    ) -> ComplianceWitness {
-        ComplianceWitness {
+    ) -> ConformanceWitness {
+        ConformanceWitness {
             consumed_data,
             created_resources,
             ephemeral_root,
@@ -166,7 +166,7 @@ impl ComplianceWitness {
     /// and accumulates the (kind, signed-quantity) contributions used for the
     /// delta commitment, so each `commitment()`, `kind()`, and field load
     /// happens once.
-    pub fn constrain(&self) -> Result<ComplianceInstance, ArmError> {
+    pub fn constrain(&self) -> Result<ConformanceInstance, ArmError> {
         let rcv_scalar = parse_rcv(&self.rcv)?;
 
         let n_consumed = self.consumed_data.len();
@@ -236,7 +236,7 @@ impl ComplianceWitness {
         let (delta_x, delta_y) = encode_delta(delta)?;
         let kind_table_commitment = self.hash_kind_table();
 
-        Ok(ComplianceInstance {
+        Ok(ConformanceInstance {
             consumed_publics,
             created_publics,
             delta_x,
@@ -299,7 +299,7 @@ fn encode_delta(delta: ProjectivePoint) -> Result<([u32; 8], [u32; 8]), ArmError
 }
 
 #[cfg(test)]
-impl Default for ComplianceWitness {
+impl Default for ConformanceWitness {
     /// The default value is meaningless and only for testing.
     /// It contains three consumed and two created resources.
     fn default() -> Self {
@@ -324,7 +324,7 @@ impl Default for ComplianceWitness {
             rand_seed: [0u8; 32],
         };
 
-        ComplianceWitness {
+        ConformanceWitness {
             consumed_data,
             created_resources: vec![make_created(nonce_0), make_created(nonce_1)],
             ephemeral_root: *INITIAL_ROOT,
@@ -334,7 +334,7 @@ impl Default for ComplianceWitness {
     }
 }
 
-impl ComplianceInstance {
+impl ConformanceInstance {
     /// Returns the delta as a projective point. It fails if the delta is not a valid point.
     pub fn delta_projective(&self) -> Result<ProjectivePoint, ArmError> {
         let encoded_point = EncodedPoint::from_affine_coordinates(

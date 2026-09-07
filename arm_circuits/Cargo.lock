@@ -1142,18 +1142,18 @@ dependencies = [
 ]
 
 [[package]]
-name = "compliance"
+name = "conformance"
 version = "1.0.0"
 dependencies = [
  "anoma-rm-risc0",
- "compliance-methods",
+ "conformance-methods",
  "criterion",
  "hex",
  "risc0-zkvm",
 ]
 
 [[package]]
-name = "compliance-methods"
+name = "conformance-methods"
 version = "1.0.0"
 dependencies = [
  "risc0-build",

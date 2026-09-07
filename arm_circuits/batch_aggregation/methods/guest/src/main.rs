@@ -13,16 +13,16 @@ fn main() {
     let witness: AggregationWitness = env::read();
     assert!(!witness.actions.is_empty(), "no actions provided");
 
-    let compliance_key = witness.compliance_key;
+    let conformance_key = witness.conformance_key;
     let mut kind_table_commitment: Option<Digest> = None;
     let mut actions_out = Vec::with_capacity(witness.actions.len());
 
     for aw in &witness.actions {
-        let ci = &aw.compliance_instance;
+        let ci = &aw.conformance_instance;
 
         // Serialize the typed compliance instance and verify the proof.
         let ci_words = to_vec(ci).expect("failed to serialize ComplianceInstance");
-        env::verify(compliance_key, &ci_words).expect("compliance proof verification failed");
+        env::verify(conformance_key, &ci_words).expect("compliance proof verification failed");
 
         // All actions must share the same kind_table_commitment.
         let ktc = *kind_table_commitment.get_or_insert(ci.kind_table_commitment);
@@ -100,7 +100,7 @@ fn main() {
     }
 
     let instance = AggregationInstance {
-        compliance_key,
+        conformance_key,
         kind_table_commitment: kind_table_commitment.unwrap(),
         actions: actions_out,
     };

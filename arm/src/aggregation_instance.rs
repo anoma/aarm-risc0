@@ -16,7 +16,7 @@ pub use evm::{abi_decode_instance, abi_encode_instance, AggregationInstanceEvm};
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct AggregationInstance {
     /// VK of the compliance circuit — single for the whole transaction.
-    pub compliance_key: Digest,
+    pub conformance_key: Digest,
     /// Shared across all actions; equality enforced in-circuit.
     pub kind_table_commitment: Digest,
     /// One entry per compliance unit / action.
@@ -96,11 +96,11 @@ mod evm {
         type DeletionCriterion is uint32;
 
         /// @notice The top-level aggregation instance committed by the batch aggregation guest.
-        /// @param compliance_key The verifying key of the compliance circuit.
+        /// @param conformance_key The verifying key of the compliance circuit.
         /// @param kind_table_commitment The shared kind table commitment across all actions.
         /// @param actions One entry per compliance unit / action.
         struct AggregationInstanceEvm {
-            bytes32 compliance_key;
+            bytes32 conformance_key;
             bytes32 kind_table_commitment;
             Action[] actions;
         }
@@ -215,7 +215,7 @@ mod evm {
     impl From<AggregationInstance> for AggregationInstanceEvm {
         fn from(inst: AggregationInstance) -> Self {
             Self {
-                compliance_key: digest_to_bytes32(&inst.compliance_key),
+                conformance_key: digest_to_bytes32(&inst.conformance_key),
                 kind_table_commitment: digest_to_bytes32(&inst.kind_table_commitment),
                 actions: inst.actions.into_iter().map(convert_action).collect(),
             }
@@ -225,7 +225,7 @@ mod evm {
     impl From<AggregationInstanceEvm> for AggregationInstance {
         fn from(evm: AggregationInstanceEvm) -> Self {
             Self {
-                compliance_key: bytes32_to_digest(evm.compliance_key),
+                conformance_key: bytes32_to_digest(evm.conformance_key),
                 kind_table_commitment: bytes32_to_digest(evm.kind_table_commitment),
                 actions: evm.actions.into_iter().map(evm_action_to_native).collect(),
             }
@@ -361,7 +361,7 @@ mod evm {
 
         fn sample_instance() -> AggregationInstance {
             AggregationInstance {
-                compliance_key: make_digest(0x01),
+                conformance_key: make_digest(0x01),
                 kind_table_commitment: make_digest(0x02),
                 actions: vec![ActionAggregated {
                     consumed_publics: vec![ConsumedResourceAggregated {
@@ -412,7 +412,7 @@ mod evm {
         #[test]
         fn test_empty_instance_roundtrip() {
             let original = AggregationInstance {
-                compliance_key: make_digest(0xAA),
+                conformance_key: make_digest(0xAA),
                 kind_table_commitment: make_digest(0xBB),
                 actions: vec![],
             };

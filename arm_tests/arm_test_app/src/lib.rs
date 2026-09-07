@@ -5,8 +5,8 @@
 use anoma_rm_risc0::{
     action::Action,
     action_tree::ActionTree,
-    compliance::ComplianceWitness,
-    compliance_unit::ComplianceUnit,
+    conformance::ConformanceWitness,
+    conformance_unit::ConformanceUnit,
     constants::{init_kind_table_from_file, kind_table},
     delta_proof::DeltaWitness,
     error::ArmError,
@@ -20,7 +20,7 @@ use anoma_rm_risc0::{
 };
 #[cfg(test)]
 use anoma_rm_risc0::{
-    compliance::ComplianceInstance,
+    conformance::ConformanceInstance,
     constants::kind_table_hash,
     proving_system::{instance_to_journal, journal_to_instance},
 };
@@ -141,23 +141,23 @@ impl Tester {
 
     /// Creates a compliance unit with `consumed_num` consumed and `created_num` created
     /// resources for the current action.
-    pub fn create_compliance_unit(
+    pub fn create_conformance_unit(
         &mut self,
         consumed_num: u32,
         created_num: u32,
-    ) -> Result<ComplianceUnit, ArmError> {
+    ) -> Result<ConformanceUnit, ArmError> {
         self.populate_consumed_resources(consumed_num);
         self.populate_created_resources(created_num)?;
 
         init_test_kind_table();
-        let compliance_witness = ComplianceWitness::from_resources(
+        let conformance_witness = ConformanceWitness::from_resources(
             self.consumed_data[self.current].clone(),
             self.created_resources[self.current].clone(),
             kind_table().to_vec(),
         );
-        self.rcvs.push(compliance_witness.rcv.clone());
+        self.rcvs.push(conformance_witness.rcv.clone());
 
-        ComplianceUnit::create(&compliance_witness, ProofType::Succinct)
+        ConformanceUnit::create(&conformance_witness, ProofType::Succinct)
     }
 
     /// Creates an action with `consumed_num` consumed and `created_num` created resources.
@@ -166,11 +166,11 @@ impl Tester {
         consumed_num: u32,
         created_num: u32,
     ) -> Result<Action, ArmError> {
-        let compliance_unit = self.create_compliance_unit(consumed_num, created_num)?;
+        let conformance_unit = self.create_conformance_unit(consumed_num, created_num)?;
 
         // Build (tag, resource, nf_key, is_consumed) entries in the compliance
         // unit's canonical tag order (consumed nullifiers, then created
-        // commitments) — exactly what `ComplianceInstance::tags()` returns.
+        // commitments) — exactly what `ConformanceInstance::tags()` returns.
         // Computing the tag once here avoids re-deriving it inside the
         // verifier loop.
         let consumed = &self.consumed_data[self.current];
@@ -201,7 +201,7 @@ impl Tester {
             })
             .collect::<Vec<LogicVerifier>>();
 
-        let action = Action::new(compliance_unit, logic_verifiers).unwrap();
+        let action = Action::new(conformance_unit, logic_verifiers).unwrap();
         self.current += 1;
         Ok(action)
     }
@@ -248,16 +248,16 @@ fn init_test_kind_table() {
 }
 
 #[cfg(test)]
-fn encode_compliance_instance(instance: &ComplianceInstance) -> Vec<u8> {
+fn encode_conformance_instance(instance: &ConformanceInstance) -> Vec<u8> {
     instance_to_journal(instance).expect("instance must serialize")
 }
 
 #[cfg(test)]
 fn set_action_kind_table_commitment(action: &mut Action, commitment: Digest) {
-    let mut instance: ComplianceInstance =
-        journal_to_instance(&action.compliance_unit.instance).expect("instance must decode");
+    let mut instance: ConformanceInstance =
+        journal_to_instance(&action.conformance_unit.instance).expect("instance must decode");
     instance.kind_table_commitment = commitment;
-    action.compliance_unit.instance = encode_compliance_instance(&instance);
+    action.conformance_unit.instance = encode_conformance_instance(&instance);
 }
 
 /// A 32-byte nonce that varies per index. The exact bytes don't matter as long
@@ -278,15 +278,15 @@ fn test_logic_prover() {
 }
 
 #[test]
-fn test_compliance_unit() {
-    let compliance_unit = Tester::default().create_compliance_unit(3, 2).unwrap();
-    assert!(compliance_unit.verify().is_ok())
+fn test_conformance_unit() {
+    let conformance_unit = Tester::default().create_conformance_unit(3, 2).unwrap();
+    assert!(conformance_unit.verify().is_ok())
 }
 
 #[test]
-fn test_compliance_unit_must_consume_resources() {
-    let compliance_unit = Tester::default().create_compliance_unit(0, 1);
-    assert!(compliance_unit.is_err())
+fn test_conformance_unit_must_consume_resources() {
+    let conformance_unit = Tester::default().create_conformance_unit(0, 1);
+    assert!(conformance_unit.is_err())
 }
 
 #[test]
@@ -460,11 +460,11 @@ fn test_aggregation_works() {
     // Full verify() must also succeed on the post-aggregation transaction.
     assert!(tx_str.verify(*kind_table_hash().unwrap()).is_ok());
 
-    // Tamper the compliance_key in the decoded instance — the receipt is still
-    // valid against BATCH_AGGREGATION_VK, but the compliance_key check must
+    // Tamper the conformance_key in the decoded instance — the receipt is still
+    // valid against BATCH_AGGREGATION_VK, but the conformance_key check must
     // now catch the mismatch before the verifier accepts the proof.
     if let Some(ref mut agg) = tx_str.aggregation {
-        agg.instance.compliance_key = Digest::from([0xABu8; 32]);
+        agg.instance.conformance_key = Digest::from([0xABu8; 32]);
     }
     assert!(tx_str.verify_aggregation().is_err());
 }
@@ -530,7 +530,7 @@ fn test_verify_aggregation_fails_for_tampered_instance() {
     // Inject a fake Aggregation with a garbage proof and a tampered instance.
     // verify_aggregation() must reject it without needing the new ELF.
     let fake_instance = AggregationInstance {
-        compliance_key: Digest::from([0xFFu8; 32]),
+        conformance_key: Digest::from([0xFFu8; 32]),
         kind_table_commitment: Digest::default(),
         actions: vec![],
     };
@@ -564,7 +564,7 @@ fn test_verify_rejects_transaction_with_both_actions_and_aggregation() {
     tx.aggregation = Some(Aggregation {
         proof: vec![0u8; 64],
         instance: AggregationInstance {
-            compliance_key: Digest::default(),
+            conformance_key: Digest::default(),
             kind_table_commitment: Digest::default(),
             actions: vec![],
         },
@@ -593,8 +593,8 @@ fn test_action_with_zero_created() {
 /// created of quantity 1 each must net to zero in the delta — covering the
 /// per-kind aggregation path inside `constrain_delta`.
 #[test]
-fn test_compliance_unit_balanced_same_kind() {
-    let unit = Tester::default().create_compliance_unit(2, 2).unwrap();
+fn test_conformance_unit_balanced_same_kind() {
+    let unit = Tester::default().create_conformance_unit(2, 2).unwrap();
     assert!(unit.verify().is_ok());
 }
 
@@ -639,7 +639,7 @@ fn test_compose_rejects_ambiguous_transaction() {
     tx_ambiguous.aggregation = Some(Aggregation {
         proof: vec![0u8; 64],
         instance: AggregationInstance {
-            compliance_key: Digest::from([0xFFu8; 32]),
+            conformance_key: Digest::from([0xFFu8; 32]),
             kind_table_commitment: Digest::default(),
             actions: vec![],
         },
@@ -674,7 +674,7 @@ fn test_cannot_aggregate_invalid_proofs() {
     };
 
     let bad_action = Action {
-        compliance_unit: actions[0].compliance_unit.clone(),
+        conformance_unit: actions[0].conformance_unit.clone(),
         logic_verifier_inputs: vec![bad_lproof],
     };
     let bad_tx = Transaction::create(vec![bad_action, actions[1].clone()], tx.delta_proof);
@@ -707,7 +707,7 @@ fn test_invalid_created_nonce_rejected() {
     tester.set_created_nonce(0, 0, [0xAA; 32]);
 
     init_test_kind_table();
-    let witness = ComplianceWitness::from_resources(
+    let witness = ConformanceWitness::from_resources(
         tester.consumed_data[0].clone(),
         tester.created_resources[0].clone(),
         kind_table().to_vec(),
