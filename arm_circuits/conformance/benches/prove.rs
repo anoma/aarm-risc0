@@ -28,7 +28,7 @@
 /// ```sh
 /// RISC0_DEV_MODE=1 cargo bench --features prove -p compliance
 /// ```
-use anoma_rm_risc0::compliance::{ComplianceWitness, INITIAL_ROOT};
+use anoma_rm_risc0::conformance::{ConformanceWitness, INITIAL_ROOT};
 use anoma_rm_risc0::constants::{init_kind_table_from_file, kind_table};
 use anoma_rm_risc0::nullifier_key::NullifierKey;
 use anoma_rm_risc0::resource::{ConsumedResourceWitness, Resource};
@@ -39,7 +39,7 @@ use std::time::Duration;
 
 const RESOURCE_COUNTS: &[usize] = &[1, 2, 4, 8];
 
-fn do_prove(witness: &ComplianceWitness) {
+fn do_prove(witness: &ConformanceWitness) {
     let env = ExecutorEnv::builder()
         .write(witness)
         .unwrap()
@@ -52,7 +52,7 @@ fn do_prove(witness: &ComplianceWitness) {
 
 /// Build a compliance witness with `count` consumed/created resources.
 /// Each consumed resource gets a unique nonce via its index in the last byte.
-fn make_witness(logic_ref: Digest, label_ref: Digest, count: usize) -> ComplianceWitness {
+fn make_witness(logic_ref: Digest, label_ref: Digest, count: usize) -> ConformanceWitness {
     let nf_key = NullifierKey::default();
 
     let consumed_data: Vec<ConsumedResourceWitness> = (0..count)
@@ -94,7 +94,7 @@ fn make_witness(logic_ref: Digest, label_ref: Digest, count: usize) -> Complianc
         })
         .collect();
 
-    ComplianceWitness {
+    ConformanceWitness {
         consumed_data,
         created_resources,
         ephemeral_root: *INITIAL_ROOT,

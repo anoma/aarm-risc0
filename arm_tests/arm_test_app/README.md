@@ -44,9 +44,9 @@ Fills the tester's per-action buffers with `num` consumed witnesses (each
 backed by a fresh nullifier key) or `num` created resources (with nonces
 derived from the consumed nullifiers).
 
-#### `Tester::create_compliance_unit(consumed_num, created_num)`
-Builds a `ComplianceWitness` from the populated resources and proves it,
-returning a `ComplianceUnit`.
+#### `Tester::create_conformance_unit(consumed_num, created_num)`
+Builds a `ConformanceWitness` from the populated resources and proves it,
+returning a `ConformanceUnit`.
 
 #### `Tester::create_an_action(consumed_num, created_num)`
 Wraps the compliance unit with the matching logic verifiers (one per
@@ -73,9 +73,9 @@ The crate includes a comprehensive test suite:
 ### Basic tests
 
 - **`test_logic_prover`**: validates individual logic proof generation.
-- **`test_compliance_unit`**: builds and verifies a compliance unit with
+- **`test_conformance_unit`**: builds and verifies a compliance unit with
   multiple consumed and created resources.
-- **`test_compliance_unit_balanced_same_kind`**: exercises per-kind quantity
+- **`test_conformance_unit_balanced_same_kind`**: exercises per-kind quantity
   aggregation in `constrain_delta` (same-kind resources netting to zero).
 - **`test_action`**: tests action creation and per-action verification.
 - **`test_action_with_zero_created`**: action with consumed but no created
@@ -86,7 +86,7 @@ The crate includes a comprehensive test suite:
 
 ### Validation tests
 
-- **`test_compliance_unit_must_consume_resources`**: a unit with zero consumed
+- **`test_conformance_unit_must_consume_resources`**: a unit with zero consumed
   resources is rejected with `EmptyNullifiers`.
 - **`test_invalid_created_nonce_rejected`**: a tampered created-resource nonce
   is rejected with `InvalidResourceNonce` inside `constrain`.

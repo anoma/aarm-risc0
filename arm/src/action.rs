@@ -3,7 +3,7 @@
 
 use crate::{
     action_tree::ActionTree,
-    compliance_unit::ComplianceUnit,
+    conformance_unit::ConformanceUnit,
     error::ArmError,
     logic_proof::{LogicVerifier, LogicVerifierInput},
 };
@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct Action {
     /// The compliance unit constraining the consumed and created resources.
-    pub compliance_unit: ComplianceUnit,
+    pub conformance_unit: ConformanceUnit,
     /// One logic-verifier input per tag (consumed nullifier or created commitment) in the unit.
     pub logic_verifier_inputs: Vec<LogicVerifierInput>,
 }
@@ -24,7 +24,7 @@ pub struct Action {
 impl Action {
     /// Builds an `Action` from a compliance unit and the matching set of logic verifiers.
     pub fn new(
-        compliance_unit: ComplianceUnit,
+        conformance_unit: ConformanceUnit,
         logic_verifiers: Vec<LogicVerifier>,
     ) -> Result<Self, ArmError> {
         let logic_verifier_inputs: Vec<LogicVerifierInput> = logic_verifiers
@@ -32,14 +32,14 @@ impl Action {
             .map(|lv| lv.try_into())
             .collect::<Result<_, _>>()?;
         Ok(Action {
-            compliance_unit,
+            conformance_unit,
             logic_verifier_inputs,
         })
     }
 
     /// Returns a reference to the compliance unit.
-    pub fn get_compliance_unit(&self) -> &ComplianceUnit {
-        &self.compliance_unit
+    pub fn get_conformance_unit(&self) -> &ConformanceUnit {
+        &self.conformance_unit
     }
 
     /// Returns a reference to the logic verifier inputs.
@@ -51,12 +51,12 @@ impl Action {
     ///
     /// Uses positional matching: `logic_verifier_inputs` must be supplied in
     /// the canonical tag order (consumed nullifiers then created commitments),
-    /// which is the same order `ComplianceInstance::tags()` produces and the
+    /// which is the same order `ConformanceInstance::tags()` produces and the
     /// aggregation guest enforces.
     pub(crate) fn get_logic_verifiers(&self) -> Result<Vec<LogicVerifier>, ArmError> {
-        let compliance_instance = self.compliance_unit.get_instance()?;
+        let conformance_instance = self.conformance_unit.get_instance()?;
 
-        let tags: Vec<Digest> = compliance_instance.tags().collect();
+        let tags: Vec<Digest> = conformance_instance.tags().collect();
 
         if tags.len() != self.logic_verifier_inputs.len() {
             return Err(ArmError::TagNotFound);
@@ -64,12 +64,12 @@ impl Action {
 
         let action_tree_root = ActionTree::new(tags).root()?;
 
-        let entries = compliance_instance
+        let entries = conformance_instance
             .consumed_publics
             .iter()
             .map(|r| (r.resource_nullifier, r.resource_logic_ref, true))
             .chain(
-                compliance_instance
+                conformance_instance
                     .created_publics
                     .iter()
                     .map(|r| (r.resource_commitment, r.resource_logic_ref, false)),
@@ -97,7 +97,7 @@ impl Action {
 
     /// Verifies all proofs and consistencies in the action.
     pub fn verify(&self) -> Result<(), ArmError> {
-        self.compliance_unit.verify()?;
+        self.conformance_unit.verify()?;
 
         let logic_verifiers = self.get_logic_verifiers()?;
         for verifier in logic_verifiers.iter() {
@@ -110,15 +110,15 @@ impl Action {
     /// This function computes the delta of the action by summing up the deltas
     /// of each compliance unit.
     pub fn delta(&self) -> Result<ProjectivePoint, ArmError> {
-        self.compliance_unit.delta()
+        self.conformance_unit.delta()
     }
 
     /// Returns this action's contribution to the delta message: its action tree root.
     pub fn get_delta_msg(&self) -> Result<Vec<u8>, ArmError> {
         let instance = self
-            .compliance_unit
+            .conformance_unit
             .get_instance()
-            .map_err(|_| ArmError::InvalidComplianceInstance)?;
+            .map_err(|_| ArmError::InvalidConformanceInstance)?;
         let tags: Vec<Digest> = instance.tags().collect();
         let root = ActionTree::new(tags).root()?;
         Ok(root.as_bytes().to_vec())

@@ -7,7 +7,7 @@ Migration notes for **anomapay-backend-multichain** and **anomapay-workers-queue
   to be replaced by a published crates.io release before this ships
 
 This is a **breaking major**. Almost every type the two services touch —
-`Action`, `ComplianceWitness`, `ComplianceInstance`, `ComplianceUnit`,
+`Action`, `ConformanceWitness`, `ConformanceInstance`, `ConformanceUnit`,
 `LogicVerifier`, `Transaction`, `DeltaInstance` — changed shape.
 
 ---
@@ -20,10 +20,10 @@ The single biggest structural change.
 
 | v1.1.1 | v2.0.0-rc.3 |
 |---|---|
-| `Action { compliance_units: Vec<ComplianceUnit>, .. }` | `Action { compliance_unit: ComplianceUnit, .. }` |
+| `Action { conformance_units: Vec<ConformanceUnit>, .. }` | `Action { conformance_unit: ConformanceUnit, .. }` |
 | One CU = exactly **1 consumed + 1 created** resource | One CU = **N consumed + M created** resources |
-| `ComplianceInstance { consumed_nullifier, consumed_logic_ref, consumed_commitment_tree_root, created_commitment, created_logic_ref, delta_x, delta_y }` | `ComplianceInstance { consumed_publics: Vec<ConsumedResourcePublic>, created_publics: Vec<CreatedResourcePublic>, delta_x, delta_y, kind_table_commitment }` |
-| `ComplianceWitness { consumed_resource, merkle_path, nf_key, created_resource, ephemeral_root, rcv }` | `ComplianceWitness { consumed_data: Vec<ConsumedResourceWitness>, created_resources: Vec<Resource>, ephemeral_root, rcv, kind_table }` |
+| `ConformanceInstance { consumed_nullifier, consumed_logic_ref, consumed_commitment_tree_root, created_commitment, created_logic_ref, delta_x, delta_y }` | `ConformanceInstance { consumed_publics: Vec<ConsumedResourcePublic>, created_publics: Vec<CreatedResourcePublic>, delta_x, delta_y, kind_table_commitment }` |
+| `ConformanceWitness { consumed_resource, merkle_path, nf_key, created_resource, ephemeral_root, rcv }` | `ConformanceWitness { consumed_data: Vec<ConsumedResourceWitness>, created_resources: Vec<Resource>, ephemeral_root, rcv, kind_table }` |
 
 New public types in `arm::resource`:
 
@@ -37,19 +37,19 @@ Constructor change:
 
 ```rust
 // v1
-ComplianceWitness::from_resources_with_path(consumed, nf_key, path, created)
+ConformanceWitness::from_resources_with_path(consumed, nf_key, path, created)
 // v2
-ComplianceWitness::from_resources_with_ephemeral_root(&consumed_data, &created_resources, valid_root, kind_table)
-ComplianceWitness::from_resources(&consumed_data, &created_resources, kind_table)  // uses INITIAL_ROOT
+ConformanceWitness::from_resources_with_ephemeral_root(&consumed_data, &created_resources, valid_root, kind_table)
+ConformanceWitness::from_resources(&consumed_data, &created_resources, kind_table)  // uses INITIAL_ROOT
 ```
 
-The per-field helpers on `ComplianceWitness` (`consumed_commitment()`,
+The per-field helpers on `ConformanceWitness` (`consumed_commitment()`,
 `created_commitment()`, `consumed_nullifier(&cm)`, `consumed_commitment_tree_root()`,
 `consumed_resource_logic()`, `created_resource_logic()`, `delta()`) are **all gone**.
-The only entry point is `constrain() -> ComplianceInstance`.
+The only entry point is `constrain() -> ConformanceInstance`.
 
 **Consequences for tag ordering.** The canonical tag order of an action is now
-`ComplianceInstance::tags()` = *all consumed nullifiers, then all created
+`ConformanceInstance::tags()` = *all consumed nullifiers, then all created
 commitments* — no longer interleaved `(consumed, created, consumed, created, …)`.
 The action tree is built from that order, so **action tree roots change** for any
 transaction with more than one resource pair, and `logic_verifier_inputs` must be
@@ -57,7 +57,7 @@ supplied in exactly that positional order. `Action::get_logic_verifiers()` and
 `Transaction::aggregate()` now do **positional** matching (v1 did a `HashMap`/`find`
 lookup by tag), and return `ArmError::TagNotFound` on mismatch.
 
-`ComplianceInstanceWords` and `COMPLIANCE_INSTANCE_SIZE` were removed — the
+`ConformanceInstanceWords` and `COMPLIANCE_INSTANCE_SIZE` were removed — the
 instance is variable-size now.
 
 ### 2. Created-resource nonces are derived, not copied
@@ -72,15 +72,15 @@ Resource::derive_nonce_from_nullifiers(index: u32, &[Digest]) -> Result<[u8; 32]
 ```
 
 with domain separator `b"ARM_NONCE_DERIVATION"` and a big-endian index.
-`ComplianceWitness::constrain()` re-derives every created resource's nonce and
+`ConformanceWitness::constrain()` re-derives every created resource's nonce and
 fails with `ArmError::InvalidResourceNonce` on mismatch. Any host code that sets
 `created.nonce = consumed_nullifier` must switch to `derive_nonce`.
 
 ### 3. Kind lookup table (skips `hash_to_curve` in the compliance circuit)
 
 New `KindTableEntry { logic_ref, label_ref, kind_point }`, carried in
-`ComplianceWitness::kind_table` and committed to as
-`ComplianceInstance::kind_table_commitment` (SHA-256 over
+`ConformanceWitness::kind_table` and committed to as
+`ConformanceInstance::kind_table_commitment` (SHA-256 over
 `logic_ref ‖ label_ref ‖ kind_point` for every entry, in order).
 
 New global loader in `arm::constants`:
@@ -108,7 +108,7 @@ to support multi-chain deployments where different chains use different kind tab
 New error variants: `KindTableCommitmentMismatch`, `KindTableCommitmentExpectedMismatch`,
 `KindTableLoadFailed`.
 
-Measured payoff (Groth16-less succinct compliance bench, from `arm_circuits/compliance/README.md`):
+Measured payoff (Groth16-less succinct compliance bench, from `arm_circuits/conformance/README.md`):
 
 | batch | no table | with table |
 |---:|:--:|:--:|
@@ -131,7 +131,7 @@ compliance↔logic bindings itself.
 ```rust
 pub struct AggregationWitness { compliance_key: Digest, actions: Vec<ActionWitness> }
 pub struct ActionWitness {
-    compliance_instance: ComplianceInstance,
+    compliance_instance: ConformanceInstance,
     consumed_app_data: Vec<AppData>,   // the only data not already in the instance
     created_app_data:  Vec<AppData>,
 }
@@ -184,7 +184,7 @@ must carry **exactly one** of `actions` / `aggregation`. Both → `AmbiguousTran
 neither → `MissingActions`. When `aggregation` is present it is *authoritative* for
 delta, nullifier and kind-table checks — deliberately, so a crafted transaction can't
 pair a genuine aggregation proof with unverified attacker-controlled `actions`.
-`verify_aggregation()` additionally pins `instance.compliance_key == COMPLIANCE_VK`.
+`verify_aggregation()` additionally pins `instance.compliance_key == CONFORMANCE_VK`.
 
 `base_proofs_are_empty()` changed meaning: it is now simply `self.actions.is_none()`
 (v1: "any individual proof is missing").
@@ -251,7 +251,7 @@ Also in `delta_proof.rs`:
 
 ```rust
 // v1                          // v2
-ComplianceUnit  { proof: Option<Vec<u8>>, .. }   →  { proof: Vec<u8>, .. }
+ConformanceUnit  { proof: Option<Vec<u8>>, .. }   →  { proof: Vec<u8>, .. }
 LogicVerifier   { proof: Option<Vec<u8>>, .. }   →  { proof: Vec<u8>, .. }
 LogicVerifierInput { proof: Option<Vec<u8>>, .. } → { proof: Vec<u8>, .. }
 ```
@@ -263,12 +263,12 @@ The `Option` existed only to model "erased after aggregation"; that state is now
 
 - `action_tree::MerkleTree` → `action_tree::ActionTree` (and `generate_path` was
   de-recursed; new `padded_leaves` helper; unit tests added).
-- `ComplianceWitness::merkle_path` → `ConsumedResourceWitness::cm_merkle_path`;
+- `ConformanceWitness::merkle_path` → `ConsumedResourceWitness::cm_merkle_path`;
   logic-side paths are `action_tree_path`.
 - `Transaction::verify(self)` → `verify(&self)`; `Action::verify(self)` → `verify(&self)`.
 - `Transaction::compose` returns `Result<Transaction, ArmError>` instead of
   panicking on mismatched delta types; rejects already-aggregated inputs.
-- `Action::get_compliance_units()` → `get_compliance_unit()`;
+- `Action::get_conformance_units()` → `get_conformance_unit()`;
   `get_logic_verifier_inputs()` returns `&[…]` instead of `&Vec<…>`.
 - `Transaction::aggregate()` is now gated on `aggregation` **and** `prove`.
 - `proving_system::instance_to_journal<T: Serialize>()` added (inverse of `journal_to_instance`).
@@ -288,7 +288,7 @@ The `Option` existed only to model "erased after aggregation"; that state is now
 | Feature | v1.1.1 | v2.0.0-rc.3-abi_encode |
 |---|---|---|
 | `default` | `transaction`, `prove` | unchanged |
-| `transaction` | `compliance_circuit`, `dep:sha3` | unchanged |
+| `transaction` | `conformance_circuit`, `dep:sha3` | unchanged |
 | `aggregation` | `aggregation_circuit`, `transaction` | `transaction` |
 | `aggregation_circuit` | ✅ | **removed** |
 | `abi_encoding` | — | **new** (`alloy-sol-types`, `alloy-primitives`) |
@@ -299,7 +299,7 @@ The three circuits that ship *inside* arm were rebuilt, so their image IDs chang
 
 | Key | v1.1.1 | v2.0.0-rc.3-abi_encode |
 |---|---|---|
-| `COMPLIANCE_VK` | `919e1300…86314d` | `88df64fe…9d8434` |
+| `CONFORMANCE_VK` | `919e1300…86314d` | `88df64fe…9d8434` |
 | `PADDING_LOGIC_VK` | `21fcc2fc…4a0bff` | `4527548f…7fea8f` |
 | `BATCH_AGGREGATION_VK` | `213b3f40…b00827` | `5dc2615f…69058e` |
 | `BATCH_AGGREGATION_EVM_VK` | — | `4c0a771d…de6978` |
@@ -443,11 +443,11 @@ consumed nullifiers, and created commitments depend on those nonces, so
 6. `action_tree = ActionTree::new([nullifiers…, commitments…].concat())`
 7. Logic witnesses for all resources, all against that one root, in
    `[consumed…, created…]` order
-8. One `ComplianceWitness` over all of them
+8. One `ConformanceWitness` over all of them
 
 #### `crates/transfer_web/src/proving/parameters.rs` — largest change
 - `compliance_witnesses()` → `compliance_witness()` (singular). Today it `zip`s
-  consumed × created × merkle-proof into one `ComplianceWitness` per pair;
+  consumed × created × merkle-proof into one `ConformanceWitness` per pair;
   it becomes one witness built from `Vec<ConsumedResourceWitness>` (resource +
   `cm_merkle_path` + `nf_key`) and `Vec<Resource>`, plus the kind table.
   `JobContext::compliance_witnesses: Vec<_>` collapses to a single value.
@@ -457,14 +457,14 @@ consumed nullifiers, and created commitments depend on those nonces, so
   (previously one per pair — in practice all `INITIAL_ROOT`, so no behaviour change).
 - `action_tree()`: leaves are currently interleaved
   `[nf₀, cm₀, nf₁, cm₁, …]`. Must become `[all nullifiers…, all commitments…]`,
-  i.e. `ComplianceInstance::tags()` order. `MerkleTree` → `ActionTree`.
+  i.e. `ConformanceInstance::tags()` order. `MerkleTree` → `ActionTree`.
 - `logic_witnesses()`: currently emits **created first, then consumed**. Must emit
   **consumed first, then created**, matching the tag order — `Action::new` and
   `aggregate()` now match positionally and will hard-fail otherwise.
 - Created-resource nonces: replace `nonce = consumed_nullifier` with the
   `derive_nonce` sequence above.
-- `generate_transaction()`: `Action::new(compliance_units, logic_proofs)` →
-  a single `Action::new(compliance_unit, logic_proofs)`;
+- `generate_transaction()`: `Action::new(conformance_units, logic_proofs)` →
+  a single `Action::new(conformance_unit, logic_proofs)`;
   `Transaction::create(vec![action], …)` keeps its one-element vec;
   `transaction.clone().verify()` → `transaction.verify()` (takes `&self` now).
 - After `aggregate()`, `transaction.actions` is `None` — anything downstream that
@@ -473,15 +473,15 @@ consumed nullifiers, and created commitments depend on those nonces, so
   count; re-check the limit against the compliance segment size.
 
 #### `crates/transfer_web/src/proving/simulation.rs` — needs a redesign
-- `ComplianceUnit { proof: None }` / `LogicVerifier { proof: None }` →
+- `ConformanceUnit { proof: None }` / `LogicVerifier { proof: None }` →
   `proof: Vec::new()`.
-- `Action::new(Vec<ComplianceUnit>, …)` → the single unit.
+- `Action::new(Vec<ConformanceUnit>, …)` → the single unit.
 - **The bigger problem:** `From<Transaction> for IProtocolAdapter::Transaction` in
   the v2 bindings builds the sol transaction from `tx.aggregation.instance.actions`
   and `panic!`s when `aggregation` is `None`. A proofless simulation transaction
   has no aggregation. So the simulation path must construct an
   `AggregationInstance` directly — with the single `ActionAggregated` assembled
-  from the constrained `ComplianceInstance` (`consumed_publics`/`created_publics`,
+  from the constrained `ConformanceInstance` (`consumed_publics`/`created_publics`,
   `delta_x`, `delta_y`), each resource's logic `app_data`, and the locally computed
   `action_tree_root` — rather than going through `Transaction`.
 - `instance_journal()` can be replaced by `proving_system::instance_to_journal()`.
@@ -500,7 +500,7 @@ consumed nullifiers, and created commitments depend on those nonces, so
 - The per-witness invariant loop uses `compliance_witness.created_resource`,
   `.consumed_commitment()`, `.consumed_nullifier(&cm)`, `.created_commitment()`,
   `.delta()` — none exist in v2. Rewrite over `constrain()`'s
-  `ComplianceInstance { consumed_publics, created_publics }`.
+  `ConformanceInstance { consumed_publics, created_publics }`.
 - The loop itself collapses: there is one witness, so the
   "nullifier consumed in multiple CUs" / "commitment created in multiple CUs"
   checks become duplicate checks *within* the single unit's
@@ -512,15 +512,15 @@ consumed nullifiers, and created commitments depend on those nonces, so
   fails on a bad `rcv`, so calling `constrain()` once covers it.
 
 #### `crates/transfer_orchestrator/src/handlers/base_proofs.rs`
-- The compliance branch submits one job instead of N. `indexed_idempotency_key(tx_id, "compliance", i)`
+- The compliance branch submits one job instead of N. `indexed_idempotency_key(tx_id, "conformance", i)`
   is now always `i = 0` — either keep the index for key stability or switch to an
   unindexed key, but do it deliberately: reused keys against the old worker would
   return v1-shaped results.
 
 #### `crates/transfer_orchestrator/src/handlers/save_base_proofs.rs`
 - `LogicVerifier { proof: Some(receipt) }` → `proof: receipt`;
-  `ComplianceUnit { proof: Some(receipt) }` → `proof: receipt`.
-- `Action::new(compliance_units, logic_proofs)` → `Action::new(compliance_unit, logic_proofs)`
+  `ConformanceUnit { proof: Some(receipt) }` → `proof: receipt`.
+- `Action::new(conformance_units, logic_proofs)` → `Action::new(conformance_unit, logic_proofs)`
   with the one unit from `ctx.compliance_proof_results`.
 - **Ordering is now load-bearing:** `ctx.logic_proof_results` is filled by
   `try_join_all` over the submitted job ids, so it preserves submission order —
@@ -530,8 +530,8 @@ consumed nullifiers, and created commitments depend on those nonces, so
 - `Transaction::create(vec![action], …)` unchanged in signature.
 
 #### `crates/transfer_orchestrator/src/handlers/context.rs`
-- `compliance_witnesses: Vec<ComplianceWitness>` → a single `Option<ComplianceWitness>`;
-  `compliance_proof_results: Vec<ComplianceUnit>` → `Option<ComplianceUnit>`.
+- `compliance_witnesses: Vec<ConformanceWitness>` → a single `Option<ConformanceWitness>`;
+  `compliance_proof_results: Vec<ConformanceUnit>` → `Option<ConformanceUnit>`.
   `require_compliance_witnesses` / `all_compliance_proofs_complete` follow.
 - `logic_proof_results: Vec<LogicVerifier>` stays a vec, but now needs a documented
   order contract (`[consumed…, created…]`) since matching is positional.
@@ -539,7 +539,7 @@ consumed nullifiers, and created commitments depend on those nonces, so
 #### `crates/transfer_orchestrator/src/services/queue.rs`
 - No API break, but `to_vec(compliance_witness)` now serializes the new
   variable-size witness — the queue worker must be on the same arm rev.
-- `COMPLIANCE_PK` bytes changed (new ELF) → all cached/idempotent base-proof
+- `CONFORMANCE_PK` bytes changed (new ELF) → all cached/idempotent base-proof
   results are invalidated.
 
 #### Startup
@@ -550,7 +550,7 @@ consumed nullifiers, and created commitments depend on those nonces, so
 - `MerkleTree` → `ActionTree` across `crates/transfer_web/src/tests/**`
   (`helpers.rs`, `proving/{mint,burn,split,transfer}.rs`, `proving/v2/*`,
   `queue_proving.rs`) and fix the leaf ordering in each.
-- `queue_proving.rs`: `Action::new`, `ComplianceUnit { proof: Some }`,
+- `queue_proving.rs`: `Action::new`, `ConformanceUnit { proof: Some }`,
   `LogicVerifier { proof: Some }`.
 - `test/helpers/mocks.rs`, `test/handlers/validation_tx.rs`: same fixups.
 
@@ -571,7 +571,7 @@ This crate reimplements `Transaction::aggregate()` so it can set
 `compliance_instances_u32`, `compliance_key`, `lp_instances_u32`, `lp_vks`) no
 longer exists.
 
-- Drop `ComplianceInstanceWords` and `bytes_to_words` (`ComplianceInstanceWords`
+- Drop `ConformanceInstanceWords` and `bytes_to_words` (`ConformanceInstanceWords`
   is gone).
 - Build a single `AggregationWitness`. With one N:M unit per transaction its
   `actions` vec has exactly one element, but keep the loop — the guest, the
@@ -581,14 +581,14 @@ longer exists.
   AggregationWitness {
       compliance_key,
       actions: tx.actions.as_ref().ok_or(..)?.iter().map(|a| ActionWitness {
-          compliance_instance: a.compliance_unit.get_instance()?,
+          compliance_instance: a.conformance_unit.get_instance()?,
           consumed_app_data: /* first n_consumed logic_verifier_inputs, in order */,
           created_app_data:  /* the rest, in order */,
       }).collect(),
   }
   ```
   and `env_builder.write(&witnesses)` once. Add assumptions from
-  `a.compliance_unit.get_inner_receipt()` and each `lvi.get_inner_receipt()`.
+  `a.conformance_unit.get_inner_receipt()` and each `lvi.get_inner_receipt()`.
   Mirror the tag/count assertions `Transaction::aggregate()` does (`tags.len() ==
   logic_verifier_inputs.len()`, positional tag equality) so a malformed job fails
   fast instead of producing a bad proof.
@@ -656,6 +656,6 @@ persisted in the DB (`pre_aggregation_transaction`, job payloads). The v2 struct
 is not wire-compatible with v1 — `actions` became `Option<Vec<Action>>` and
 `aggregation_proof: Option<Vec<u8>>` became `aggregation: Option<Aggregation>`,
 so old blobs fail to deserialize rather than degrading gracefully. Drain all
-in-flight jobs before cutover, or version the payload. `COMPLIANCE_PK` also
+in-flight jobs before cutover, or version the payload. `CONFORMANCE_PK` also
 changed, so any cached or idempotency-keyed base-proof results from before the
 bump are invalid.

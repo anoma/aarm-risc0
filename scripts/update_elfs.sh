@@ -11,38 +11,56 @@ extract_image_id() {
     grep 'ImageID:' | sed 's/ImageID: \([0-9a-f]*\).*/\1/'
 }
 
-echo "==> Building compliance guest"
-COMPLIANCE_OUT=$(cargo risczero build \
-    --manifest-path arm_circuits/compliance/methods/guest/Cargo.toml 2>&1 | tee /dev/stderr)
+# Retry wrapper: retries a command up to 3 times on failure (handles transient
+# Docker network errors when downloading crates from crates.io inside the container).
+risczero_build_with_retry() {
+    local attempt=1
+    local max=3
+    local out
+    while true; do
+        out=$(cargo risczero build "$@" 2>&1 | tee /dev/stderr) && break
+        if [ "$attempt" -ge "$max" ]; then
+            echo "ERROR: cargo risczero build failed after $max attempts" >&2
+            return 1
+        fi
+        echo "==> Build attempt $attempt failed (likely transient network error), retrying..." >&2
+        attempt=$((attempt + 1))
+    done
+    echo "$out"
+}
+
+echo "==> Building conformance guest"
+COMPLIANCE_OUT=$(risczero_build_with_retry \
+    --manifest-path arm_circuits/conformance/methods/guest/Cargo.toml)
 COMPLIANCE_ID=$(echo "$COMPLIANCE_OUT" | extract_image_id)
-cp arm_circuits/compliance/methods/guest/target/riscv32im-risc0-zkvm-elf/docker/compliance-guest.bin \
-    arm/elfs/compliance-guest.bin
+cp arm_circuits/conformance/methods/guest/target/riscv32im-risc0-zkvm-elf/docker/conformance-guest.bin \
+    arm/elfs/conformance-guest.bin
 
 echo "==> Building trivial logic (padding) guest"
-TRIVIAL_OUT=$(cargo risczero build \
-    --manifest-path arm_circuits/trivial_logic/methods/guest/Cargo.toml 2>&1 | tee /dev/stderr)
+TRIVIAL_OUT=$(risczero_build_with_retry \
+    --manifest-path arm_circuits/trivial_logic/methods/guest/Cargo.toml)
 TRIVIAL_ID=$(echo "$TRIVIAL_OUT" | extract_image_id)
 cp arm_circuits/trivial_logic/methods/guest/target/riscv32im-risc0-zkvm-elf/docker/trivial-logic-guest.bin \
     arm/elfs/trivial-logic-guest.bin
 
 echo "==> Building logic test guest"
-LOGIC_TEST_OUT=$(cargo risczero build \
-    --manifest-path arm_circuits/logic_test/methods/guest/Cargo.toml 2>&1 | tee /dev/stderr)
+LOGIC_TEST_OUT=$(risczero_build_with_retry \
+    --manifest-path arm_circuits/logic_test/methods/guest/Cargo.toml)
 LOGIC_TEST_ID=$(echo "$LOGIC_TEST_OUT" | extract_image_id)
 cp arm_circuits/logic_test/methods/guest/target/riscv32im-risc0-zkvm-elf/docker/logic-test-guest.bin \
     arm_tests/arm_test_app/elf/logic-test-guest.bin
 
 echo "==> Building batch aggregation guest (default)"
-AGG_OUT=$(cargo risczero build \
-    --manifest-path arm_circuits/batch_aggregation/methods/guest/Cargo.toml 2>&1 | tee /dev/stderr)
+AGG_OUT=$(risczero_build_with_retry \
+    --manifest-path arm_circuits/batch_aggregation/methods/guest/Cargo.toml)
 AGG_ID=$(echo "$AGG_OUT" | extract_image_id)
 cp arm_circuits/batch_aggregation/methods/guest/target/riscv32im-risc0-zkvm-elf/docker/batch-aggregation-guest.bin \
     arm/elfs/batch-aggregation-guest.bin
 
 echo "==> Building batch aggregation guest (EVM ABI-encoded)"
-AGG_EVM_OUT=$(cargo risczero build \
+AGG_EVM_OUT=$(risczero_build_with_retry \
     --manifest-path arm_circuits/batch_aggregation/methods/guest/Cargo.toml \
-    --features abi_encoding 2>&1 | tee /dev/stderr)
+    --features abi_encoding)
 AGG_EVM_ID=$(echo "$AGG_EVM_OUT" | extract_image_id)
 # The emitted artifact is still named batch-aggregation-guest.bin regardless of features
 cp arm_circuits/batch_aggregation/methods/guest/target/riscv32im-risc0-zkvm-elf/docker/batch-aggregation-guest.bin \
@@ -76,7 +94,7 @@ def extract_vks(text):
 constants = pathlib.Path("arm/src/constants.rs").read_text()
 vks = extract_vks(constants)
 
-patch_hex("arm/src/constants.rs", vks["COMPLIANCE_VK"],            "$COMPLIANCE_ID")
+patch_hex("arm/src/constants.rs", vks["CONFORMANCE_VK"],            "$COMPLIANCE_ID")
 patch_hex("arm/src/constants.rs", vks["PADDING_LOGIC_VK"],         "$TRIVIAL_ID")
 patch_hex("arm/src/constants.rs", vks["BATCH_AGGREGATION_VK"],     "$AGG_ID")
 patch_hex("arm/src/constants.rs", vks["BATCH_AGGREGATION_EVM_VK"], "$AGG_EVM_ID")
@@ -88,7 +106,7 @@ PYEOF
 
 echo ""
 echo "==> Image IDs"
-echo "  COMPLIANCE_VK:          $COMPLIANCE_ID"
+echo "  CONFORMANCE_VK:          $COMPLIANCE_ID"
 echo "  PADDING_LOGIC_VK:       $TRIVIAL_ID"
 echo "  TEST_LOGIC_VK:          $LOGIC_TEST_ID"
 echo "  BATCH_AGGREGATION_VK:   $AGG_ID"
