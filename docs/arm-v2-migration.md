@@ -86,22 +86,27 @@ New `KindTableEntry { logic_ref, label_ref, kind_point }`, carried in
 New global loader in `arm::constants`:
 
 ```rust
-init_kind_table_from_file(path: &Path) -> Result<(), ArmError>  // first call wins
-global_kind_table()      -> &'static [KindTableEntry]
-global_kind_table_hash() -> Option<&'static Digest>
-kind_entry_for(table, resource) -> Option<KindTableEntry>       // lookup, falls back to hash_to_curve
+// Initialize from a JSON file (first call wins; subsequent calls are no-ops)
+init_kind_table_from_file(path: &Path) -> Result<(), ArmError>
+// Initialize from pre-built entries (same semantics; useful in tests)
+init_kind_table_from_entries(entries: Vec<KindTableEntry>) -> Result<(), ArmError>
+
+kind_table()      -> &'static [KindTableEntry]
+kind_table_hash() -> Option<&'static Digest>
 ```
 
-Entries are `{ "logic_ref": "<hex>", "label_ref": "<hex>" }`; the kind point is
-derived at load time via hash-to-curve so the file can't drift out of sync.
-A starter `arm/data/kind_table.json` ships in the repo (padding logic + test logic).
+Entries are `{ "logic_ref": "<hex>", "label_ref": "<hex>", "kind_point": "<hex>" }`.
+The `kind_point` is an uncompressed SEC1-encoded secp256k1 point (65 bytes, `04` prefix)
+stored in the file; no hash-to-curve is performed at load time. Each point is validated
+against the curve on load. A starter `arm/data/kind_table.json` ships in the repo
+(padding logic + test logic).
 
-**Operational impact:** `Transaction::verify()` now calls
-`kind_table_commitment_check()`, which requires the global table to be loaded and
-to match the commitment in every compliance unit. Without
-`init_kind_table_from_file`, verification fails with `ArmError::KindTableNotLoaded`.
-New error variants: `KindTableCommitmentMismatch`, `KindTableGlobalMismatch`,
-`KindTableNotLoaded`, `KindTableLoadFailed`.
+**Operational impact:** `Transaction::verify(kind_table_commitment)` now takes the
+expected kind table commitment as an explicit parameter. Callers obtain it from
+`kind_table_hash()` — do not unwrap; propagate `None` as an error. Pass it explicitly
+to support multi-chain deployments where different chains use different kind tables.
+New error variants: `KindTableCommitmentMismatch`, `KindTableCommitmentExpectedMismatch`,
+`KindTableLoadFailed`.
 
 Measured payoff (Groth16-less succinct compliance bench, from `arm_circuits/compliance/README.md`):
 

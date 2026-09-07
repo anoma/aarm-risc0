@@ -1,5 +1,6 @@
 //! Transaction structure and associated methods.
 
+use crate::aggregation_instance::AggregationInstance;
 #[cfg(all(feature = "aggregation", feature = "prove", feature = "abi_encoding"))]
 use crate::constants::BATCH_AGGREGATION_EVM_PK;
 #[cfg(all(feature = "aggregation", feature = "abi_encoding"))]
@@ -12,7 +13,6 @@ use crate::constants::BATCH_AGGREGATION_EVM_VK;
 use crate::constants::BATCH_AGGREGATION_PK;
 #[cfg(feature = "aggregation")]
 use crate::constants::COMPLIANCE_VK;
-use crate::{aggregation_instance::AggregationInstance, constants::global_kind_table_hash};
 #[cfg(all(feature = "aggregation", feature = "prove"))]
 use crate::{
     aggregation_witness::{ActionWitness, AggregationWitness},
@@ -102,7 +102,12 @@ impl Transaction {
     }
 
     /// Verifies all the proofs and corresponding checks in the transaction.
-    pub fn verify(&self) -> Result<(), ArmError> {
+    ///
+    /// `kind_table_commitment` is the expected SHA-256 commitment of the kind
+    /// table for the target chain. Callers that use the loaded global table
+    /// should obtain it via `kind_table_hash()` and propagate the `None` case
+    /// as an error rather than panicking.
+    pub fn verify(&self, kind_table_commitment: Digest) -> Result<(), ArmError> {
         // A transaction must carry exactly one representation. Rejecting the
         // "both present" case here prevents a crafted transaction from
         // pairing a genuine (but unrelated) aggregation proof with
@@ -118,7 +123,7 @@ impl Transaction {
 
                 // Check for nullifier duplication across all compliance units
                 self.nf_duplication_check()?;
-                self.kind_table_commitment_check()?;
+                self.kind_table_commitment_check(kind_table_commitment)?;
 
                 if self.aggregation.is_some() {
                     #[cfg(not(feature = "aggregation"))]
@@ -155,13 +160,13 @@ impl Transaction {
     }
 
     /// Checks that all compliance units in the transaction commit to the same kind table,
-    /// and that the commitment matches the loaded global kind table.
+    /// and that the commitment matches `expected`.
     ///
     /// When `aggregation` is present it is authoritative: the commitment is
     /// read from the proof-backed `aggregation.instance` (cross-action
     /// consistency was already enforced in-circuit by the aggregation
     /// guest), never from `actions`, even if both happen to be populated.
-    pub fn kind_table_commitment_check(&self) -> Result<(), ArmError> {
+    pub fn kind_table_commitment_check(&self, expected: Digest) -> Result<(), ArmError> {
         let commitment = if let Some(agg) = &self.aggregation {
             agg.instance.kind_table_commitment
         } else if let Some(actions) = &self.actions {
@@ -169,21 +174,20 @@ impl Transaction {
             let Some(first) = iter.next() else {
                 return Ok(());
             };
-            let expected = first.compliance_unit.get_instance()?.kind_table_commitment;
+            let tx_commitment = first.compliance_unit.get_instance()?.kind_table_commitment;
             for action in iter {
                 let commitment = action.compliance_unit.get_instance()?.kind_table_commitment;
-                if commitment != expected {
+                if commitment != tx_commitment {
                     return Err(ArmError::KindTableCommitmentMismatch);
                 }
             }
-            expected
+            tx_commitment
         } else {
             return Err(ArmError::MissingActions);
         };
 
-        let global_hash = global_kind_table_hash().ok_or(ArmError::KindTableNotLoaded)?;
-        if commitment != *global_hash {
-            return Err(ArmError::KindTableGlobalMismatch);
+        if commitment != expected {
+            return Err(ArmError::KindTableCommitmentExpectedMismatch);
         }
         Ok(())
     }

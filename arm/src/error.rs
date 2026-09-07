@@ -74,10 +74,8 @@ pub enum ArmError {
     NullifierDuplication,
     #[error("kind_table_commitment mismatch across compliance units")]
     KindTableCommitmentMismatch,
-    #[error("kind_table_commitment does not match the loaded global kind table")]
-    KindTableGlobalMismatch,
-    #[error("global kind table not loaded")]
-    KindTableNotLoaded,
+    #[error("kind_table_commitment does not match the expected commitment")]
+    KindTableCommitmentExpectedMismatch,
     #[error("Empty tree")]
     EmptyTree,
     #[error("Invalid shared secret")]
