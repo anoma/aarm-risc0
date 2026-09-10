@@ -255,13 +255,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "anoma-rm-risc0"
+version = "2.0.0-rc.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "adf60b4865adfb1bd8203077f3f455de7b53dac928a8acc9640b523ee211be52"
+dependencies = [
+ "alloy-primitives",
+ "alloy-sol-types",
+ "bincode",
+ "bytemuck",
+ "hex",
+ "k256",
+ "lazy_static",
+ "rand 0.8.6",
+ "risc0-zkvm",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "sha3",
+ "thiserror 2.0.17",
+]
+
+[[package]]
 name = "anoma-rm-risc0-gadgets"
 version = "2.0.0-rc.5"
 dependencies = [
  "aes-gcm",
  "alloy-primitives",
  "alloy-sol-types",
- "anoma-rm-risc0",
+ "anoma-rm-risc0 2.0.0-rc.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "bincode",
  "hex",
  "k256",
@@ -274,7 +296,7 @@ dependencies = [
 name = "anoma-rm-risc0-test-app"
 version = "2.0.0-rc.5"
 dependencies = [
- "anoma-rm-risc0",
+ "anoma-rm-risc0 2.0.0-rc.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "anoma-rm-risc0-test-witness",
  "hex",
  "lazy_static",
@@ -285,7 +307,7 @@ dependencies = [
 name = "anoma-rm-risc0-test-witness"
 version = "2.0.0-rc.5"
 dependencies = [
- "anoma-rm-risc0",
+ "anoma-rm-risc0 2.0.0-rc.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "anoma-rm-risc0-gadgets",
  "k256",
  "serde",
